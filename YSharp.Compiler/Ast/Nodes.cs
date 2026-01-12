@@ -25,6 +25,15 @@ public record BoolLiteralExpr(bool Value, TextSpan Span) : Expr(Span);
 /// <summary>String literal: "hello"</summary>
 public record StringLiteralExpr(string Value, TextSpan Span) : Expr(Span);
 
+/// <summary>Double literal: 3.14, 0.5</summary>
+public record DoubleLiteralExpr(double Value, TextSpan Span) : Expr(Span);
+
+/// <summary>None literal: absence of value</summary>
+public record NoneExpr(TextSpan Span) : Expr(Span);
+
+/// <summary>Some expression: Some(value)</summary>
+public record SomeExpr(Expr Value, TextSpan Span) : Expr(Span);
+
 /// <summary>
 /// Interpolated string: $"Hello {name}!"
 /// Parts alternate between string literals and expressions.
@@ -62,11 +71,12 @@ public record TryExpr(Expr Operand, TextSpan Span) : Expr(Span);
 public record BinaryExpr(Expr Left, string Op, Expr Right, TextSpan Span) : Expr(Span);
 
 /// <summary>
-/// Function call: add(1, 2), print("hello")
+/// Function call: add(1, 2), print("hello"), identity&lt;int&gt;(42)
 /// Target is what we're calling (usually an identifier).
+/// TypeArgs are optional generic type arguments.
 /// Args are the arguments passed.
 /// </summary>
-public record CallExpr(Expr Target, List<Expr> Args, TextSpan Span) : Expr(Span);
+public record CallExpr(Expr Target, List<TypeRef> TypeArgs, List<Expr> Args, TextSpan Span) : Expr(Span);
 
 /// <summary>
 /// Member access: Error.Validation, user.name
@@ -128,6 +138,9 @@ public record NamedTypeRef(string Name, TextSpan Span) : TypeRef(Span);
 
 /// <summary>Generic type: Result&lt;int, string&gt;, List&lt;User&gt;</summary>
 public record GenericTypeRef(string Name, List<TypeRef> TypeArgs, TextSpan Span) : TypeRef(Span);
+
+/// <summary>Optional type: T? (sugar for Option&lt;T&gt;)</summary>
+public record OptionalTypeRef(TypeRef Inner, TextSpan Span) : TypeRef(Span);
 
 // =============================================================================
 // STATEMENTS - Things that do something but don't produce a value
@@ -191,6 +204,12 @@ public record AssignStmt(string Target, Expr Value, TextSpan Span) : Stmt(Span);
 /// </summary>
 public record CompoundAssignStmt(string Target, string Op, Expr Value, TextSpan Span) : Stmt(Span);
 
+/// <summary>Break statement: exit the innermost loop</summary>
+public record BreakStmt(TextSpan Span) : Stmt(Span);
+
+/// <summary>Continue statement: skip to next iteration of innermost loop</summary>
+public record ContinueStmt(TextSpan Span) : Stmt(Span);
+
 // =============================================================================
 // DECLARATIONS - Top-level program elements
 // =============================================================================
@@ -216,6 +235,7 @@ public record Modifier(string Name, List<Expr>? Args, TextSpan Span) : AstNode(S
 /// </summary>
 public record FnDecl(
     string Name,
+    List<string> TypeParams,   // Generic type parameters: <T, U>
     List<Param> Params,
     TypeRef ReturnType,
     List<Modifier> Modifiers,  // ~blocking, ~log(info), etc.

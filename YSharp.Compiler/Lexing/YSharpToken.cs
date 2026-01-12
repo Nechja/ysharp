@@ -40,12 +40,16 @@ public enum YSharpToken
     Else,       // else - alternative branch
     True,       // true - boolean literal
     False,      // false - boolean literal
+    None,       // None - absence of value (Option<T>)
+    Some,       // Some - present value (Option<T>)
     Let,        // let - immutable variable declaration
     Mut,        // mut - mutable variable declaration
     Match,      // match - pattern matching
     Underscore, // _ - wildcard pattern
     For,        // for - unified loop
     In,         // in - iterator binding
+    Break,      // break - exit loop
+    Continue,   // continue - skip to next iteration
     Blocking,   // blocking - synchronous block expression
 
     // ===== Dependency Injection Keywords =====
@@ -64,6 +68,9 @@ public enum YSharpToken
     // Built-in type names
 
     Int,        // int - 32-bit integer
+    Long,       // long - 64-bit integer
+    Float,      // float - single precision
+    Double,     // double - double precision
     Bool,       // bool - true/false
     StringType, // string - text (can't use "String" as it conflicts)
     Void,       // void - no return value

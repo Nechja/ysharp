@@ -534,17 +534,22 @@ public class Transpiler(string assemblyName)
         var parameters = string.Join(", ", method.Params.Select(p =>
             $"{TranspileType(p.Type)} {p.Name}"));
 
+        // Generic type parameters
+        var typeParams = method.TypeParams.Count > 0
+            ? $"<{string.Join(", ", method.TypeParams)}>"
+            : "";
+
         if (isBlocking)
         {
             // Blocking method: synchronous
             var returnType = TranspileType(method.ReturnType);
-            AppendLine($"public {returnType} {Capitalize(method.Name)}({parameters})");
+            AppendLine($"public {returnType} {Capitalize(method.Name)}{typeParams}({parameters})");
         }
         else
         {
             // Async method: default
             var returnType = GetAsyncReturnType(method.ReturnType);
-            AppendLine($"public async {returnType} {Capitalize(method.Name)}({parameters})");
+            AppendLine($"public async {returnType} {Capitalize(method.Name)}{typeParams}({parameters})");
         }
 
         if (method.Body != null)
@@ -594,17 +599,22 @@ public class Transpiler(string assemblyName)
         var parameters = string.Join(", ", fn.Params.Select(p =>
             $"{TranspileType(p.Type)} {p.Name}"));
 
+        // Generic type parameters
+        var typeParams = fn.TypeParams.Count > 0
+            ? $"<{string.Join(", ", fn.TypeParams)}>"
+            : "";
+
         if (isBlocking)
         {
             // Blocking function: synchronous
             var returnType = TranspileType(fn.ReturnType);
-            AppendLine($"static {returnType} {Capitalize(fn.Name)}({parameters})");
+            AppendLine($"static {returnType} {Capitalize(fn.Name)}{typeParams}({parameters})");
         }
         else
         {
             // Async function: default
             var returnType = GetAsyncReturnType(fn.ReturnType);
-            AppendLine($"static async {returnType} {Capitalize(fn.Name)}({parameters})");
+            AppendLine($"static async {returnType} {Capitalize(fn.Name)}{typeParams}({parameters})");
         }
 
         if (fn.Body != null)
@@ -654,6 +664,14 @@ public class Transpiler(string assemblyName)
                     TranspileExpression(ret.Value);
                 }
                 _sb.AppendLine(";");
+                break;
+
+            case BreakStmt:
+                AppendLine("break;");
+                break;
+
+            case ContinueStmt:
+                AppendLine("continue;");
                 break;
 
             case IfStmt ifStmt:
@@ -818,8 +836,21 @@ public class Transpiler(string assemblyName)
                 _sb.Append(num.Value);
                 break;
 
+            case DoubleLiteralExpr dbl:
+                _sb.Append(dbl.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                break;
+
             case BoolLiteralExpr b:
                 _sb.Append(b.Value ? "true" : "false");
+                break;
+
+            case NoneExpr:
+                _sb.Append("null");
+                break;
+
+            case SomeExpr some:
+                // Some(x) just unwraps to x in C# nullable semantics
+                TranspileExpression(some.Value);
                 break;
 
             case IdentifierExpr id:
@@ -993,6 +1024,11 @@ public class Transpiler(string assemblyName)
 
     private void TranspileCall(CallExpr call)
     {
+        // Format type arguments if present
+        var typeArgs = call.TypeArgs.Count > 0
+            ? $"<{string.Join(", ", call.TypeArgs.Select(TranspileType))}>"
+            : "";
+
         // Handle built-ins
         if (call.Target is IdentifierExpr id)
         {
@@ -1007,7 +1043,7 @@ public class Transpiler(string assemblyName)
                     // Check if this is a type constructor (needs 'new')
                     if (_typeNames.Contains(id.Name))
                     {
-                        _sb.Append($"new {id.Name}(");
+                        _sb.Append($"new {id.Name}{typeArgs}(");
                         TranspileArgs(call.Args);
                         _sb.Append(")");
                         return;
@@ -1017,7 +1053,7 @@ public class Transpiler(string assemblyName)
                     {
                         _sb.Append("await ");
                     }
-                    _sb.Append(Capitalize(id.Name));
+                    _sb.Append($"{Capitalize(id.Name)}{typeArgs}");
                     _sb.Append("(");
                     TranspileArgs(call.Args);
                     _sb.Append(")");
@@ -1084,11 +1120,15 @@ public class Transpiler(string assemblyName)
             {
                 "void" => "void",
                 "int" => "int",
+                "long" => "long",
+                "float" => "float",
+                "double" => "double",
                 "bool" => "bool",
                 "string" => "string",
                 _ => named.Name
             },
             GenericTypeRef generic => $"{generic.Name}<{string.Join(", ", generic.TypeArgs.Select(TranspileType))}>",
+            OptionalTypeRef optional => $"{TranspileType(optional.Inner)}?",
             _ => "object"
         };
     }

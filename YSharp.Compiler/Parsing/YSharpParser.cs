@@ -43,6 +43,9 @@ public static class YSharpParser
     /// </summary>
     private static TokenListParser<YSharpToken, TypeRef> SimpleType { get; } =
         Token.EqualTo(YSharpToken.Int).Select(t => (TypeRef)new NamedTypeRef("int", t.Span))
+            .Or(Token.EqualTo(YSharpToken.Long).Select(t => (TypeRef)new NamedTypeRef("long", t.Span)))
+            .Or(Token.EqualTo(YSharpToken.Float).Select(t => (TypeRef)new NamedTypeRef("float", t.Span)))
+            .Or(Token.EqualTo(YSharpToken.Double).Select(t => (TypeRef)new NamedTypeRef("double", t.Span)))
             .Or(Token.EqualTo(YSharpToken.Bool).Select(t => (TypeRef)new NamedTypeRef("bool", t.Span)))
             .Or(Token.EqualTo(YSharpToken.StringType).Select(t => (TypeRef)new NamedTypeRef("string", t.Span)))
             .Or(Token.EqualTo(YSharpToken.Void).Select(t => (TypeRef)new NamedTypeRef("void", t.Span)));
@@ -58,12 +61,23 @@ public static class YSharpParser
         select (TypeRef)new GenericTypeRef(name.ToStringValue(), args.ToList(), name.Span);
 
     /// <summary>
-    /// Parse a type reference: int, Result&lt;int, string&gt;, MyType
+    /// Base type reference without optional suffix
     /// </summary>
-    private static TokenListParser<YSharpToken, TypeRef> TypeReference { get; } =
+    private static TokenListParser<YSharpToken, TypeRef> BaseTypeReference { get; } =
         GenericType.Try()
             .Or(SimpleType)
             .Or(Token.EqualTo(YSharpToken.Identifier).Select(t => (TypeRef)new NamedTypeRef(t.ToStringValue(), t.Span)));
+
+    /// <summary>
+    /// Parse a type reference: int, Result&lt;int, string&gt;, MyType, int?
+    /// Supports optional ? suffix for Option&lt;T&gt; sugar
+    /// </summary>
+    private static TokenListParser<YSharpToken, TypeRef> TypeReference { get; } =
+        from baseType in BaseTypeReference
+        from optional in Token.EqualTo(YSharpToken.Question).Optional()
+        select optional.HasValue
+            ? (TypeRef)new OptionalTypeRef(baseType, baseType.Span)
+            : baseType;
 
     // =========================================================================
     // EXPRESSIONS
@@ -74,10 +88,27 @@ public static class YSharpParser
         Token.EqualTo(YSharpToken.Integer)
             .Select(t => (Expr)new IntLiteralExpr(int.Parse(t.ToStringValue()), t.Span));
 
+    /// <summary>Double literal: 3.14</summary>
+    private static TokenListParser<YSharpToken, Expr> DoubleLiteral { get; } =
+        Token.EqualTo(YSharpToken.Decimal)
+            .Select(t => (Expr)new DoubleLiteralExpr(double.Parse(t.ToStringValue()), t.Span));
+
     /// <summary>Boolean literal: true, false</summary>
     private static TokenListParser<YSharpToken, Expr> BoolLiteral { get; } =
         Token.EqualTo(YSharpToken.True).Select(t => (Expr)new BoolLiteralExpr(true, t.Span))
             .Or(Token.EqualTo(YSharpToken.False).Select(t => (Expr)new BoolLiteralExpr(false, t.Span)));
+
+    /// <summary>None literal: absence of value</summary>
+    private static TokenListParser<YSharpToken, Expr> NoneLiteral { get; } =
+        Token.EqualTo(YSharpToken.None).Select(t => (Expr)new NoneExpr(t.Span));
+
+    /// <summary>Some expression: Some(value)</summary>
+    private static TokenListParser<YSharpToken, Expr> SomeExpr { get; } =
+        from some in Token.EqualTo(YSharpToken.Some)
+        from lparen in Token.EqualTo(YSharpToken.LParen)
+        from value in Parse.Ref(() => Expression)
+        from rparen in Token.EqualTo(YSharpToken.RParen)
+        select (Expr)new SomeExpr(value, some.Span);
 
     /// <summary>String literal: "hello"</summary>
     private static TokenListParser<YSharpToken, Expr> StringLiteral { get; } =
@@ -174,7 +205,7 @@ public static class YSharpParser
                 }
             }
 
-            return new CallExpr(target, args, span);
+            return new CallExpr(target, new List<TypeRef>(), args, span);
         }
 
         return ParseMemberAccess(text, span);
@@ -278,9 +309,12 @@ public static class YSharpParser
         Match.Try()  // Try() because match starts with keyword, needs backtrack
             .Or(Blocking.Try())  // Try() because blocking starts with keyword
             .Or(ScopeBlock.Try())  // Try() for scope keyword
+            .Or(SomeExpr.Try())  // Some(value)
             .Or(ArrayLiteral)
+            .Or(DoubleLiteral)  // Must come before IntLiteral
             .Or(IntLiteral)
             .Or(BoolLiteral)
+            .Or(NoneLiteral)  // None
             .Or(InterpolatedStringLiteral)
             .Or(StringLiteral)
             .Or(This)
@@ -299,17 +333,33 @@ public static class YSharpParser
         .Or(Primary);
 
     /// <summary>
+    /// Type arguments for generic calls: &lt;int, string&gt;
+    /// </summary>
+    private static TokenListParser<YSharpToken, List<TypeRef>> CallTypeArgs { get; } =
+        from lt in Token.EqualTo(YSharpToken.LessThan)
+        from types in TypeReference.ManyDelimitedBy(Token.EqualTo(YSharpToken.Comma))
+        from gt in Token.EqualTo(YSharpToken.GreaterThan)
+        select types.ToList();
+
+    /// <summary>
     /// Postfix operations: calls foo(args), member access foo.bar, index arr[i], try expr?
     /// These chain: Error.Validation("msg") is (Error.Validation)("msg")
     /// </summary>
     private static TokenListParser<YSharpToken, Expr> Postfix { get; } =
         from target in Unary
         from ops in (
-            // Function call: (args)
-            (from lparen in Token.EqualTo(YSharpToken.LParen)
+            // Generic function call: <types>(args) - must Try() because < could be comparison
+            (from typeArgs in CallTypeArgs
+             from lparen in Token.EqualTo(YSharpToken.LParen)
              from args in Expression.ManyDelimitedBy(Token.EqualTo(YSharpToken.Comma))
              from rparen in Token.EqualTo(YSharpToken.RParen)
-             select (Func<Expr, Expr>)(e => new CallExpr(e, args.ToList(), EmptySpan)))
+             select (Func<Expr, Expr>)(e => new CallExpr(e, typeArgs, args.ToList(), EmptySpan))).Try()
+            .Or(
+            // Non-generic function call: (args)
+            from lparen in Token.EqualTo(YSharpToken.LParen)
+            from args in Expression.ManyDelimitedBy(Token.EqualTo(YSharpToken.Comma))
+            from rparen in Token.EqualTo(YSharpToken.RParen)
+            select (Func<Expr, Expr>)(e => new CallExpr(e, new List<TypeRef>(), args.ToList(), EmptySpan)))
             .Or(
             // Index access: [index]
              from lbracket in Token.EqualTo(YSharpToken.LBracket)
@@ -437,6 +487,18 @@ public static class YSharpParser
         from semi in Token.EqualTo(YSharpToken.Semicolon)
         select (Stmt)new ReturnStmt(value, ret.Span);
 
+    /// <summary>Break statement: break;</summary>
+    private static TokenListParser<YSharpToken, Stmt> BreakStatement { get; } =
+        from brk in Token.EqualTo(YSharpToken.Break)
+        from semi in Token.EqualTo(YSharpToken.Semicolon)
+        select (Stmt)new BreakStmt(brk.Span);
+
+    /// <summary>Continue statement: continue;</summary>
+    private static TokenListParser<YSharpToken, Stmt> ContinueStatement { get; } =
+        from cont in Token.EqualTo(YSharpToken.Continue)
+        from semi in Token.EqualTo(YSharpToken.Semicolon)
+        select (Stmt)new ContinueStmt(cont.Span);
+
     /// <summary>Expression statement: expr; (for side effects like function calls)</summary>
     private static TokenListParser<YSharpToken, Stmt> ExpressionStatement { get; } =
         from expr in Expression
@@ -539,6 +601,8 @@ public static class YSharpParser
         IfStatement
             .Or(ForStatement)
             .Or(ReturnStatement)
+            .Or(BreakStatement)
+            .Or(ContinueStatement)
             .Or(VarDeclaration)  // Starts with let/mut, unambiguous
             .Or(CompoundAssignment.Try())  // Try() - starts with Identifier
             .Or(Assignment.Try())  // Try() because starts with Identifier like ExpressionStatement
@@ -840,24 +904,36 @@ public static class YSharpParser
     // =========================================================================
 
     /// <summary>
-    /// Function with block body: fn name(params) -> type ~modifiers { body }
+    /// Type parameters for generic functions: &lt;T, U&gt;
+    /// </summary>
+    private static TokenListParser<YSharpToken, List<string>> TypeParams { get; } =
+        (from lt in Token.EqualTo(YSharpToken.LessThan)
+         from names in Token.EqualTo(YSharpToken.Identifier).ManyDelimitedBy(Token.EqualTo(YSharpToken.Comma))
+         from gt in Token.EqualTo(YSharpToken.GreaterThan)
+         select names.Select(n => n.ToStringValue()).ToList())
+        .OptionalOrDefault(new List<string>());
+
+    /// <summary>
+    /// Function with block body: fn name&lt;T&gt;(params) -> type ~modifiers { body }
     /// </summary>
     private static TokenListParser<YSharpToken, FnDecl> FnWithBlock { get; } =
         from fn in Token.EqualTo(YSharpToken.Fn)
         from name in Token.EqualTo(YSharpToken.Identifier)
+        from typeParams in TypeParams
         from parms in Parameters
         from arrow in Token.EqualTo(YSharpToken.Arrow)
         from retType in TypeReference
         from mods in Modifiers
         from body in Block
-        select new FnDecl(name.ToStringValue(), parms, retType, mods, body, null, fn.Span);
+        select new FnDecl(name.ToStringValue(), typeParams, parms, retType, mods, body, null, fn.Span);
 
     /// <summary>
-    /// Function with expression body: fn name(params) -> type ~modifiers => expr;
+    /// Function with expression body: fn name&lt;T&gt;(params) -> type ~modifiers => expr;
     /// </summary>
     private static TokenListParser<YSharpToken, FnDecl> FnWithExpr { get; } =
         from fn in Token.EqualTo(YSharpToken.Fn)
         from name in Token.EqualTo(YSharpToken.Identifier)
+        from typeParams in TypeParams
         from parms in Parameters
         from arrow in Token.EqualTo(YSharpToken.Arrow)
         from retType in TypeReference
@@ -865,7 +941,7 @@ public static class YSharpParser
         from fatArrow in Token.EqualTo(YSharpToken.FatArrow)
         from expr in Expression
         from semi in Token.EqualTo(YSharpToken.Semicolon)
-        select new FnDecl(name.ToStringValue(), parms, retType, mods, null, expr, fn.Span);
+        select new FnDecl(name.ToStringValue(), typeParams, parms, retType, mods, null, expr, fn.Span);
 
     /// <summary>
     /// Function declaration (either style).

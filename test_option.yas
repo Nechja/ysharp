@@ -1,0 +1,33 @@
+// Test: Option<T> with None, Some, and T? sugar
+
+fn find_user(id: int) -> string? {
+    if id == 1 {
+        return Some("Alice");
+    }
+    return None;
+}
+
+fn main() -> void {
+    // Test with existing user
+    let user1 = find_user(1);
+    if user1 != None {
+        print($"Found user: {user1}");
+    }
+
+    // Test with non-existing user
+    let user2 = find_user(42);
+    if user2 == None {
+        print("User not found");
+    }
+
+    // Direct None/Some usage
+    let maybe_value: int? = Some(42);
+    print($"Value: {maybe_value}");
+
+    let no_value: int? = None;
+    if no_value == None {
+        print("No value present");
+    }
+
+    print("Done!");
+}

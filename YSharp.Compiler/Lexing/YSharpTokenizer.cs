@@ -62,6 +62,16 @@ public static class YSharpTokenizer
         select Unit.Value;
 
     /// <summary>
+    /// Matches a decimal number: digits.digits
+    /// Examples: 3.14, 0.5, 100.0
+    /// </summary>
+    private static TextParser<Unit> DecimalToken { get; } =
+        from whole in Character.Digit.AtLeastOnce()
+        from dot in Character.EqualTo('.')
+        from frac in Character.Digit.AtLeastOnce()
+        select Unit.Value;
+
+    /// <summary>
     /// Matches an integer: one or more digits
     /// Examples: 0, 42, 12345
     /// </summary>
@@ -124,7 +134,8 @@ public static class YSharpTokenizer
             .Match(InterpolatedStringToken, YSharpToken.InterpolatedString)
             .Match(StringToken, YSharpToken.String)
 
-            // ----- Numbers -----
+            // ----- Numbers (decimal MUST come before integer!) -----
+            .Match(DecimalToken, YSharpToken.Decimal)
             .Match(IntegerToken, YSharpToken.Integer)
 
             // ----- Keywords (MUST come before Identifier!) -----
@@ -140,12 +151,16 @@ public static class YSharpTokenizer
             .Match(Span.EqualTo("else"), YSharpToken.Else, requireDelimiters: true)
             .Match(Span.EqualTo("true"), YSharpToken.True, requireDelimiters: true)
             .Match(Span.EqualTo("false"), YSharpToken.False, requireDelimiters: true)
+            .Match(Span.EqualTo("None"), YSharpToken.None, requireDelimiters: true)
+            .Match(Span.EqualTo("Some"), YSharpToken.Some, requireDelimiters: true)
             .Match(Span.EqualTo("let"), YSharpToken.Let, requireDelimiters: true)
             .Match(Span.EqualTo("mut"), YSharpToken.Mut, requireDelimiters: true)
             .Match(Span.EqualTo("match"), YSharpToken.Match, requireDelimiters: true)
             .Match(Span.EqualTo("_"), YSharpToken.Underscore, requireDelimiters: true)
             .Match(Span.EqualTo("for"), YSharpToken.For, requireDelimiters: true)
             .Match(Span.EqualTo("in"), YSharpToken.In, requireDelimiters: true)
+            .Match(Span.EqualTo("break"), YSharpToken.Break, requireDelimiters: true)
+            .Match(Span.EqualTo("continue"), YSharpToken.Continue, requireDelimiters: true)
             .Match(Span.EqualTo("blocking"), YSharpToken.Blocking, requireDelimiters: true)
             .Match(Span.EqualTo("service"), YSharpToken.Service, requireDelimiters: true)
             .Match(Span.EqualTo("singleton"), YSharpToken.Singleton, requireDelimiters: true)
@@ -158,6 +173,9 @@ public static class YSharpTokenizer
             .Match(Span.EqualTo("extends"), YSharpToken.Extends, requireDelimiters: true)
             .Match(Span.EqualTo("scope"), YSharpToken.Scope, requireDelimiters: true)
             .Match(Span.EqualTo("int"), YSharpToken.Int, requireDelimiters: true)
+            .Match(Span.EqualTo("long"), YSharpToken.Long, requireDelimiters: true)
+            .Match(Span.EqualTo("float"), YSharpToken.Float, requireDelimiters: true)
+            .Match(Span.EqualTo("double"), YSharpToken.Double, requireDelimiters: true)
             .Match(Span.EqualTo("bool"), YSharpToken.Bool, requireDelimiters: true)
             .Match(Span.EqualTo("string"), YSharpToken.StringType, requireDelimiters: true)
             .Match(Span.EqualTo("void"), YSharpToken.Void, requireDelimiters: true)
@@ -184,12 +202,16 @@ public static class YSharpTokenizer
         ["else"] = YSharpToken.Else,
         ["true"] = YSharpToken.True,
         ["false"] = YSharpToken.False,
+        ["None"] = YSharpToken.None,
+        ["Some"] = YSharpToken.Some,
         ["let"] = YSharpToken.Let,
         ["mut"] = YSharpToken.Mut,
         ["match"] = YSharpToken.Match,
         ["_"] = YSharpToken.Underscore,
         ["for"] = YSharpToken.For,
         ["in"] = YSharpToken.In,
+        ["break"] = YSharpToken.Break,
+        ["continue"] = YSharpToken.Continue,
         ["blocking"] = YSharpToken.Blocking,
         ["service"] = YSharpToken.Service,
         ["singleton"] = YSharpToken.Singleton,
@@ -202,6 +224,9 @@ public static class YSharpTokenizer
         ["extends"] = YSharpToken.Extends,
         ["scope"] = YSharpToken.Scope,
         ["int"] = YSharpToken.Int,
+        ["long"] = YSharpToken.Long,
+        ["float"] = YSharpToken.Float,
+        ["double"] = YSharpToken.Double,
         ["bool"] = YSharpToken.Bool,
         ["string"] = YSharpToken.StringType,
         ["void"] = YSharpToken.Void,

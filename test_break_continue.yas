@@ -1,0 +1,34 @@
+// Test: break and continue statements
+
+fn main() -> void {
+    // Test break
+    print("Testing break:");
+    for i in 0..10 {
+        if i == 5 {
+            break;
+        }
+        print($"  {i}");
+    }
+
+    // Test continue
+    print("Testing continue (skip evens):");
+    for i in 0..10 {
+        if i % 2 == 0 {
+            continue;
+        }
+        print($"  {i}");
+    }
+
+    // Test break in while-style loop
+    print("Testing break in condition loop:");
+    mut count = 0;
+    for count < 100 {
+        if count >= 3 {
+            break;
+        }
+        print($"  count = {count}");
+        count += 1;
+    }
+
+    print("Done!");
+}
