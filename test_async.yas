@@ -1,0 +1,18 @@
+// Test async-first design
+
+// This should be async by default
+fn get_value() -> int {
+    return 42;
+}
+
+// This should be blocking (synchronous)
+fn get_value_sync() -> int ~blocking {
+    return 42;
+}
+
+fn main() -> void {
+    let x = get_value();
+    let y = get_value_sync();
+    print($"async result: {x}");
+    print($"sync result: {y}");
+}

@@ -1,0 +1,26 @@
+// Test all three for loop forms
+
+fn main() -> void {
+    // 1. Range-style: for i in 0..5
+    print("Range loop:");
+    for i in 0..3 {
+        print(i);
+    }
+
+    // 2. Foreach-style: for x in collection
+    print("Foreach loop:");
+    let nums = [10, 20, 30];
+    for n in nums {
+        print(n);
+    }
+
+    // 3. While-style: for condition
+    print("While loop:");
+    mut x = 3;
+    for x > 0 {
+        print(x);
+        x = x - 1;
+    }
+
+    print("Done!");
+}

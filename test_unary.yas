@@ -1,0 +1,22 @@
+// Test unary operators
+
+fn negate(n: int) -> int {
+    return -n;
+}
+
+fn not_flag(flag: bool) -> bool {
+    return !flag;
+}
+
+fn main() -> void {
+    let x = -5;
+    let y = negate(10);
+    let flag = !true;
+
+    print("x = -5:");
+    print(x);
+    print("negate(10):");
+    print(y);
+    print("!true:");
+    print(flag);
+}

@@ -1,0 +1,20 @@
+// Test index access
+
+fn main() -> void {
+    // Array literal with index access
+    let nums = [10, 20, 30, 40, 50];
+    print($"First: {nums[0]}");
+    print($"Third: {nums[2]}");
+    print($"Last: {nums[4]}");
+
+    // Index with variable
+    let i = 1;
+    print($"nums[{i}] = {nums[i]}");
+
+    // Index with expression
+    print($"nums[1+1] = {nums[1 + 1]}");
+
+    // Chained index (multidimensional concept)
+    let matrix = [[1, 2], [3, 4]];
+    print($"matrix[0][1] = {matrix[0][1]}");
+}

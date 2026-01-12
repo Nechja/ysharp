@@ -1,0 +1,27 @@
+// Test new operators: &&, ||, %
+
+fn main() -> void {
+    // Logical AND
+    let both = true && true;
+    let mixed = true && false;
+    print($"true && true = {both}");
+    print($"true && false = {mixed}");
+
+    // Logical OR
+    let either = true || false;
+    let neither = false || false;
+    print($"true || false = {either}");
+    print($"false || false = {neither}");
+
+    // Modulo
+    let remainder = 17 % 5;
+    print($"17 % 5 = {remainder}");
+
+    // Combined precedence: && binds tighter than ||
+    let complex = true || false && false;
+    print($"true || false && false = {complex}");
+
+    // Comparison with logical
+    let check = 5 > 3 && 10 < 20;
+    print($"5 > 3 && 10 < 20 = {check}");
+}

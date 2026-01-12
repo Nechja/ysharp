@@ -1,0 +1,18 @@
+// Test string interpolation
+
+record Person {
+    name: string;
+    age: int;
+}
+
+fn main() -> void {
+    let name = "Alice";
+    let age = 30;
+
+    print($"Hello, {name}!");
+    print($"You are {age} years old.");
+    print($"In 10 years you'll be {age} + 10.");
+
+    let person = Person("Bob", 25);
+    print($"Person: {person.name}, Age: {person.age}");
+}

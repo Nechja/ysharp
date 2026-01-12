@@ -1,0 +1,20 @@
+// Test records and variables
+
+record Point {
+    x: int;
+    y: int;
+}
+
+record User {
+    id: int;
+    name: string;
+    active: bool = true;
+}
+
+fn main() -> void {
+    let x = 5;
+    mut y = 10;
+    let sum = x + y;
+    print("Testing records and variables!");
+    print(sum);
+}

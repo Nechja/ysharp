@@ -1,0 +1,32 @@
+// Test function modifiers
+
+// Simple modifier (will be used for blocking later)
+fn sync_op() -> void ~blocking {
+    print("This is a blocking operation");
+}
+
+// Modifier with argument
+fn timed_op() -> void ~timed {
+    print("This operation is timed");
+}
+
+// Multiple modifiers
+fn logged_timed() -> void ~log ~timed {
+    print("Logged and timed");
+}
+
+// Modifier with value argument
+fn with_timeout() -> void ~timeout(5000) {
+    print("Has a timeout");
+}
+
+// Expression body with modifier
+fn quick() -> int ~blocking => 42;
+
+fn main() -> void {
+    sync_op();
+    timed_op();
+    logged_timed();
+    with_timeout();
+    print($"quick = {quick()}");
+}

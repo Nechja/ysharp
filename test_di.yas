@@ -1,0 +1,25 @@
+// Test: DI - Service, Module, and App
+// Tests the dependency injection system
+
+// Interface for greeting service
+interface IGreeter {
+    fn greet(name: string) -> string;
+}
+
+// A simple greeting service
+service singleton GreetingService : IGreeter {
+    fn greet(name: string) -> string => $"Hello, {name}!";
+}
+
+// Module configures the DI container
+module Services {
+    bind IGreeter => GreetingService;
+}
+
+// App entry point with injected services
+app Services {
+    fn main(greeter: IGreeter) -> void {
+        let message = greeter.greet("Y#");
+        print(message);
+    }
+}

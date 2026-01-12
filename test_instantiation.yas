@@ -1,0 +1,36 @@
+// Test object instantiation and class implements interface
+
+record User {
+    id: int;
+    name: string;
+}
+
+interface Greeter {
+    fn greet(name: string) -> string;
+}
+
+class FriendlyGreeter : Greeter {
+    fn greet(name: string) -> string {
+        return "Hello!";
+    }
+}
+
+class Counter(initial: int) {
+    fn get_initial() -> int {
+        return initial;
+    }
+}
+
+fn main() -> void {
+    // Object instantiation - no 'new' keyword in Y#
+    let user = User(1, "Alice");
+    print("Created user");
+
+    // Class instantiation with interface
+    let greeter = FriendlyGreeter();
+    print(greeter.greet("World"));
+
+    // Class with constructor params
+    let counter = Counter(10);
+    print("Counter created");
+}

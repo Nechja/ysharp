@@ -1,0 +1,11 @@
+// Test class with primary constructor
+
+class Counter(start: int) {
+    fn get() -> int {
+        return start;
+    }
+}
+
+fn main() -> void {
+    print("Testing classes with primary constructor!");
+}

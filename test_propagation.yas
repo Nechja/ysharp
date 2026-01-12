@@ -1,0 +1,25 @@
+// Test the ? error propagation operator
+
+// Function that can fail
+fn divide(a: int, b: int) -> Result<int> {
+    if b == 0 {
+        return Error.Validation("Division by zero");
+    }
+    return a / b;
+}
+
+// Function that uses ? to propagate errors
+fn calculate(x: int, y: int) -> Result<int> {
+    let result = divide(x, y)?;
+    return result * 2;
+}
+
+fn main() -> void {
+    // Test successful case
+    let success = calculate(10, 2);
+    print($"10 / 2 * 2 = {success}");
+
+    // Test error case
+    let failure = calculate(10, 0);
+    print($"10 / 0 = {failure}");
+}

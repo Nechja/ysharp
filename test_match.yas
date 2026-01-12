@@ -1,0 +1,15 @@
+// Test match expressions
+
+fn describe(n: int) -> string {
+    return match n {
+        0 => "zero";
+        1 => "one";
+        _ => "other";
+    };
+}
+
+fn main() -> void {
+    print(describe(0));
+    print(describe(1));
+    print(describe(42));
+}

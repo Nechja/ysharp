@@ -1,0 +1,4 @@
+// Our first Y# program!
+fn main() -> void {
+    print("Hello from Y#!");
+}

@@ -1,0 +1,15 @@
+// Test interface declarations
+
+interface Greeter {
+    fn greet(name: string) -> string;
+    fn farewell(name: string) -> string;
+}
+
+interface Calculator {
+    fn add(a: int, b: int) -> int;
+    fn multiply(a: int, b: int) -> int;
+}
+
+fn main() -> void {
+    print("Interfaces defined!");
+}
