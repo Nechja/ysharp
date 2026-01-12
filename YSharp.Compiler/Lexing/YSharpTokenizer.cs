@@ -145,6 +145,7 @@ public static class YSharpTokenizer
             .Match(Span.EqualTo("class"), YSharpToken.Class, requireDelimiters: true)
             .Match(Span.EqualTo("interface"), YSharpToken.Interface, requireDelimiters: true)
             .Match(Span.EqualTo("enum"), YSharpToken.Enum, requireDelimiters: true)
+            .Match(Span.EqualTo("error"), YSharpToken.ErrorType, requireDelimiters: true)
             .Match(Span.EqualTo("this"), YSharpToken.This, requireDelimiters: true)
             .Match(Span.EqualTo("return"), YSharpToken.Return, requireDelimiters: true)
             .Match(Span.EqualTo("if"), YSharpToken.If, requireDelimiters: true)
@@ -161,6 +162,7 @@ public static class YSharpTokenizer
             .Match(Span.EqualTo("in"), YSharpToken.In, requireDelimiters: true)
             .Match(Span.EqualTo("break"), YSharpToken.Break, requireDelimiters: true)
             .Match(Span.EqualTo("continue"), YSharpToken.Continue, requireDelimiters: true)
+            .Match(Span.EqualTo("with"), YSharpToken.With, requireDelimiters: true)
             .Match(Span.EqualTo("blocking"), YSharpToken.Blocking, requireDelimiters: true)
             .Match(Span.EqualTo("service"), YSharpToken.Service, requireDelimiters: true)
             .Match(Span.EqualTo("singleton"), YSharpToken.Singleton, requireDelimiters: true)
@@ -172,6 +174,11 @@ public static class YSharpTokenizer
             .Match(Span.EqualTo("app"), YSharpToken.App, requireDelimiters: true)
             .Match(Span.EqualTo("extends"), YSharpToken.Extends, requireDelimiters: true)
             .Match(Span.EqualTo("scope"), YSharpToken.Scope, requireDelimiters: true)
+            .Match(Span.EqualTo("route"), YSharpToken.Route, requireDelimiters: true)
+            .Match(Span.EqualTo("get"), YSharpToken.Get, requireDelimiters: true)
+            .Match(Span.EqualTo("post"), YSharpToken.Post, requireDelimiters: true)
+            .Match(Span.EqualTo("put"), YSharpToken.Put, requireDelimiters: true)
+            .Match(Span.EqualTo("delete"), YSharpToken.Delete, requireDelimiters: true)
             .Match(Span.EqualTo("int"), YSharpToken.Int, requireDelimiters: true)
             .Match(Span.EqualTo("long"), YSharpToken.Long, requireDelimiters: true)
             .Match(Span.EqualTo("float"), YSharpToken.Float, requireDelimiters: true)
@@ -196,6 +203,7 @@ public static class YSharpTokenizer
         ["class"] = YSharpToken.Class,
         ["interface"] = YSharpToken.Interface,
         ["enum"] = YSharpToken.Enum,
+        ["error"] = YSharpToken.ErrorType,
         ["this"] = YSharpToken.This,
         ["return"] = YSharpToken.Return,
         ["if"] = YSharpToken.If,
@@ -212,6 +220,7 @@ public static class YSharpTokenizer
         ["in"] = YSharpToken.In,
         ["break"] = YSharpToken.Break,
         ["continue"] = YSharpToken.Continue,
+        ["with"] = YSharpToken.With,
         ["blocking"] = YSharpToken.Blocking,
         ["service"] = YSharpToken.Service,
         ["singleton"] = YSharpToken.Singleton,
@@ -223,6 +232,11 @@ public static class YSharpTokenizer
         ["app"] = YSharpToken.App,
         ["extends"] = YSharpToken.Extends,
         ["scope"] = YSharpToken.Scope,
+        ["route"] = YSharpToken.Route,
+        ["get"] = YSharpToken.Get,
+        ["post"] = YSharpToken.Post,
+        ["put"] = YSharpToken.Put,
+        ["delete"] = YSharpToken.Delete,
         ["int"] = YSharpToken.Int,
         ["long"] = YSharpToken.Long,
         ["float"] = YSharpToken.Float,

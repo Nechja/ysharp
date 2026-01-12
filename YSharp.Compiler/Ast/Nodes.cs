@@ -126,6 +126,12 @@ public record IndexAccessExpr(Expr Target, Expr Index, TextSpan Span) : Expr(Spa
 /// </summary>
 public record BlockingExpr(List<Stmt> Statements, Expr? ResultExpr, TextSpan Span) : Expr(Span);
 
+/// <summary>
+/// With expression: record with { field: value, field2: value2 }
+/// Creates a copy of a record with some fields modified.
+/// </summary>
+public record WithExpr(Expr Base, List<(string Name, Expr Value)> Updates, TextSpan Span) : Expr(Span);
+
 // =============================================================================
 // TYPES - Type annotations
 // =============================================================================
@@ -327,6 +333,17 @@ public record EnumDecl(
     TextSpan Span
 ) : Decl(Span);
 
+/// <summary>
+/// Error declaration: error Name { Variant1; Variant2 { data: type; }; }
+/// Domain-specific error types as tagged unions.
+/// Transpiles to sealed record hierarchy implementing IError marker.
+/// </summary>
+public record ErrorDecl(
+    string Name,
+    List<EnumVariant> Variants,
+    TextSpan Span
+) : Decl(Span);
+
 // =============================================================================
 // DEPENDENCY INJECTION - Services, Modules, and DI Configuration
 // =============================================================================
@@ -398,3 +415,38 @@ public record AppDecl(
 /// Creates a new DI scope for scoped services.
 /// </summary>
 public record ScopeExpr(List<Stmt> Statements, TextSpan Span) : Expr(Span);
+
+// =============================================================================
+// HTTP ROUTING
+// =============================================================================
+
+/// <summary>
+/// HTTP method for route endpoints.
+/// </summary>
+public enum HttpMethod
+{
+    Get,
+    Post,
+    Put,
+    Delete
+}
+
+/// <summary>
+/// Single route endpoint: get "/" => handler;
+/// </summary>
+public record RouteEndpoint(
+    HttpMethod Method,
+    string Path,
+    string Handler,
+    List<Modifier> Modifiers,
+    TextSpan Span
+) : AstNode(Span);
+
+/// <summary>
+/// Route declaration: route "/users" { endpoints }
+/// </summary>
+public record RouteDecl(
+    string BasePath,
+    List<RouteEndpoint> Endpoints,
+    TextSpan Span
+) : Decl(Span);

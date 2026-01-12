@@ -45,9 +45,11 @@ public class Transpiler(string assemblyName)
         var classes = declarations.OfType<ClassDecl>();
         var interfaces = declarations.OfType<InterfaceDecl>();
         var enums = declarations.OfType<EnumDecl>();
+        var errors = declarations.OfType<ErrorDecl>();
         var services = declarations.OfType<ServiceDecl>();
         var modules = declarations.OfType<ModuleDecl>();
         var appDecl = declarations.OfType<AppDecl>().FirstOrDefault();
+        var routes = declarations.OfType<RouteDecl>();
 
         // First pass - collect type names, async functions, and check if Result is used
         CollectTypeNames(declarations);
@@ -86,6 +88,12 @@ public class Transpiler(string assemblyName)
         foreach (var enm in enums)
         {
             TranspileEnum(enm);
+        }
+
+        // 4b. Error types (domain-specific error tagged unions)
+        foreach (var err in errors)
+        {
+            TranspileError(err);
         }
 
         // 5. Records
@@ -146,6 +154,14 @@ public class Transpiler(string assemblyName)
                     foreach (var variant in enm.Variants)
                     {
                         _typeNames.Add($"{enm.Name}.{variant.Name}");
+                    }
+                    break;
+                case ErrorDecl err:
+                    _typeNames.Add(err.Name);
+                    // Also add error variant names as constructors
+                    foreach (var variant in err.Variants)
+                    {
+                        _typeNames.Add($"{err.Name}.{variant.Name}");
                     }
                     break;
                 case ServiceDecl svc:
@@ -218,6 +234,7 @@ public class Transpiler(string assemblyName)
         AppendLine("");
         AppendLine("enum ErrorKind { Failure, Validation, NotFound, Unexpected }");
         AppendLine("");
+        AppendLine("// Single-parameter Result for built-in Error type");
         AppendLine("readonly struct Result<T>");
         AppendLine("{");
         AppendLine("    public T? Value { get; }");
@@ -229,6 +246,30 @@ public class Transpiler(string assemblyName)
         AppendLine("    public static implicit operator Result<T>(T value) => new(value);");
         AppendLine("    public static implicit operator Result<T>(Error error) => new(error);");
         AppendLine("    public override string ToString() => IsError ? $\"Error: {Error}\" : $\"Ok: {Value}\";");
+        AppendLine("    // Combinators");
+        AppendLine("    public Result<U> Map<U>(Func<T, U> fn) => IsError ? Error!.Value : fn(Value!);");
+        AppendLine("    public Result<U> Then<U>(Func<T, Result<U>> fn) => IsError ? Error!.Value : fn(Value!);");
+        AppendLine("    public T UnwrapOr(T defaultValue) => IsOk ? Value! : defaultValue;");
+        AppendLine("    public T UnwrapOrElse(Func<Error, T> fn) => IsOk ? Value! : fn(Error!.Value);");
+        AppendLine("}");
+        AppendLine("");
+        AppendLine("// Two-parameter Result for custom error types");
+        AppendLine("readonly struct Result<T, E>");
+        AppendLine("{");
+        AppendLine("    public T? Value { get; }");
+        AppendLine("    public E? Error { get; }");
+        AppendLine("    public bool IsError => Error is not null;");
+        AppendLine("    public bool IsOk => !IsError;");
+        AppendLine("    private Result(T value) { Value = value; Error = default; }");
+        AppendLine("    private Result(E error) { Value = default; Error = error; }");
+        AppendLine("    public static implicit operator Result<T, E>(T value) => new(value);");
+        AppendLine("    public static implicit operator Result<T, E>(E error) => new(error);");
+        AppendLine("    public override string ToString() => IsError ? $\"Error: {Error}\" : $\"Ok: {Value}\";");
+        AppendLine("    // Combinators");
+        AppendLine("    public Result<U, E> Map<U>(Func<T, U> fn) => IsError ? Error! : fn(Value!);");
+        AppendLine("    public Result<U, E> Then<U>(Func<T, Result<U, E>> fn) => IsError ? Error! : fn(Value!);");
+        AppendLine("    public T UnwrapOr(T defaultValue) => IsOk ? Value! : defaultValue;");
+        AppendLine("    public T UnwrapOrElse(Func<E, T> fn) => IsOk ? Value! : fn(Error!);");
         AppendLine("}");
         AppendLine("");
     }
@@ -294,6 +335,39 @@ public class Transpiler(string assemblyName)
                 var parameters = string.Join(", ", variant.Fields.Select(f =>
                     $"{TranspileType(f.Type)} {Capitalize(f.Name)}"));
                 AppendLine($"public sealed record {variant.Name}({parameters}) : {enm.Name};");
+            }
+        }
+
+        _indent--;
+        AppendLine("}");
+        AppendLine("");
+    }
+
+    private void TranspileError(ErrorDecl err)
+    {
+        // Error types are discriminated unions similar to enums
+        // but semantically represent domain errors
+        AppendLine($"abstract record {err.Name}");
+        AppendLine("{");
+        _indent++;
+
+        // Private constructor to prevent external subclassing
+        AppendLine($"private {err.Name}() {{ }}");
+        AppendLine("");
+
+        foreach (var variant in err.Variants)
+        {
+            if (variant.Fields.Count == 0)
+            {
+                // Simple variant: sealed record NotFound : OrderError;
+                AppendLine($"public sealed record {variant.Name}() : {err.Name};");
+            }
+            else
+            {
+                // Variant with data: sealed record ValidationFailed(string Message) : OrderError;
+                var parameters = string.Join(", ", variant.Fields.Select(f =>
+                    $"{TranspileType(f.Type)} {Capitalize(f.Name)}"));
+                AppendLine($"public sealed record {variant.Name}({parameters}) : {err.Name};");
             }
         }
 
@@ -946,6 +1020,20 @@ public class Transpiler(string assemblyName)
                 Append("}))()");
                 break;
 
+            case WithExpr withExpr:
+                // With expression: record with { field = value }
+                TranspileExpression(withExpr.Base);
+                _sb.Append(" with { ");
+                for (int i = 0; i < withExpr.Updates.Count; i++)
+                {
+                    if (i > 0) _sb.Append(", ");
+                    var (name, value) = withExpr.Updates[i];
+                    _sb.Append($"{Capitalize(name)} = ");
+                    TranspileExpression(value);
+                }
+                _sb.Append(" }");
+                break;
+
             case ScopeExpr scopeExpr:
                 // Scope expression: creates a new DI scope
                 // Transpile as using block with service scope
@@ -1085,10 +1173,16 @@ public class Transpiler(string assemblyName)
         }
 
         // Method call on object: obj.method(args) - capitalize method name
-        // Methods are async by default, so await them
+        // Only await if the target is an identifier (service instance).
+        // Don't await chained method calls like result.Map(...) or ParseInt().Then(...)
         if (call.Target is MemberAccessExpr methodCall)
         {
-            _sb.Append("await ");
+            // Only await if target is an identifier (like service.method())
+            // This excludes chained calls like result.Map() or ParseInt().Then()
+            if (methodCall.Target is IdentifierExpr targetId && _asyncFunctions.Contains($"{targetId.Name}"))
+            {
+                _sb.Append("await ");
+            }
             TranspileExpression(methodCall.Target);
             _sb.Append($".{Capitalize(methodCall.Member)}(");
             TranspileArgs(call.Args);

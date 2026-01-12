@@ -34,6 +34,7 @@ public enum YSharpToken
     Class,      // class - behavior/service type
     Interface,  // interface - contract definition
     Enum,       // enum - tagged union (algebraic data type)
+    ErrorType,  // error - domain error type (tagged union for errors)
     This,       // this - self reference
     Return,     // return - exit function with value
     If,         // if - conditional
@@ -50,6 +51,7 @@ public enum YSharpToken
     In,         // in - iterator binding
     Break,      // break - exit loop
     Continue,   // continue - skip to next iteration
+    With,       // with - record copy with modifications
     Blocking,   // blocking - synchronous block expression
 
     // ===== Dependency Injection Keywords =====
@@ -63,6 +65,13 @@ public enum YSharpToken
     App,        // app - application entry point
     Extends,    // extends - module inheritance
     Scope,      // scope - explicit scope block
+
+    // ===== HTTP Keywords =====
+    Route,      // route - HTTP route block
+    Get,        // get - HTTP GET method
+    Post,       // post - HTTP POST method
+    Put,        // put - HTTP PUT method
+    Delete,     // delete - HTTP DELETE method
 
     // ===== Type Keywords =====
     // Built-in type names

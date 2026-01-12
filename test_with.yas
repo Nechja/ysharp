@@ -1,0 +1,26 @@
+// Test: with expression for records
+
+record User {
+    id: int;
+    name: string;
+    verified: bool;
+}
+
+fn main() -> void {
+    // Create original user
+    let user = User(1, "Alice", false);
+    print($"Original: id={user.Id}, name={user.Name}, verified={user.Verified}");
+
+    // Create modified copy with verified = true
+    let verified_user = user with { verified: true };
+    print($"Verified: id={verified_user.Id}, name={verified_user.Name}, verified={verified_user.Verified}");
+
+    // Create copy with multiple changes
+    let renamed = user with { name: "Bob", verified: true };
+    print($"Renamed: id={renamed.Id}, name={renamed.Name}, verified={renamed.Verified}");
+
+    // Original unchanged
+    print($"Original still: name={user.Name}, verified={user.Verified}");
+
+    print("Done!");
+}

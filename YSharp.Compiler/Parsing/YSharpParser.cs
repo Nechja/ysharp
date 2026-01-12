@@ -446,6 +446,32 @@ public static class YSharpParser
             (op, left, right) => (Expr)new BinaryExpr(left, op, right, EmptySpan));
 
     /// <summary>
+    /// Field update in with expression: name: value
+    /// </summary>
+    private static TokenListParser<YSharpToken, (string, Expr)> WithFieldUpdate { get; } =
+        from name in Token.EqualTo(YSharpToken.Identifier)
+        from colon in Token.EqualTo(YSharpToken.Colon)
+        from value in Parse.Ref(() => Expression)
+        select (name.ToStringValue(), value);
+
+    /// <summary>
+    /// With expression: record with { field: value }
+    /// Creates a copy of a record with modified fields.
+    /// </summary>
+    private static TokenListParser<YSharpToken, Expr> WithExpression { get; } =
+        from baseExpr in LogicalOr
+        from withPart in (
+            from withKw in Token.EqualTo(YSharpToken.With)
+            from lbrace in Token.EqualTo(YSharpToken.LBrace)
+            from updates in WithFieldUpdate.ManyDelimitedBy(Token.EqualTo(YSharpToken.Comma))
+            from rbrace in Token.EqualTo(YSharpToken.RBrace)
+            select updates.ToList()
+        ).OptionalOrDefault()
+        select withPart != null && withPart.Count > 0
+            ? (Expr)new WithExpr(baseExpr, withPart, EmptySpan)
+            : baseExpr;
+
+    /// <summary>
     /// Lambda with single parameter: x => expr
     /// </summary>
     private static TokenListParser<YSharpToken, Expr> SingleParamLambda { get; } =
@@ -471,7 +497,7 @@ public static class YSharpParser
     private static TokenListParser<YSharpToken, Expr> Lambda { get; } =
         SingleParamLambda.Try()
             .Or(MultiParamLambda.Try())
-            .Or(LogicalOr);
+            .Or(WithExpression);
 
     /// <summary>Top-level expression parser</summary>
     public static TokenListParser<YSharpToken, Expr> Expression { get; } = Lambda;
@@ -763,6 +789,18 @@ public static class YSharpParser
         from rbrace in Token.EqualTo(YSharpToken.RBrace)
         select new EnumDecl(name.ToStringValue(), variants.ToList(), keyword.Span);
 
+    /// <summary>
+    /// Error declaration: error Name { Variant1; Variant2 { data: type; }; }
+    /// Domain-specific error types as tagged unions.
+    /// </summary>
+    private static TokenListParser<YSharpToken, ErrorDecl> Error { get; } =
+        from keyword in Token.EqualTo(YSharpToken.ErrorType)
+        from name in Token.EqualTo(YSharpToken.Identifier)
+        from lbrace in Token.EqualTo(YSharpToken.LBrace)
+        from variants in EnumVariant.Many()
+        from rbrace in Token.EqualTo(YSharpToken.RBrace)
+        select new ErrorDecl(name.ToStringValue(), variants.ToList(), keyword.Span);
+
     // =========================================================================
     // MODIFIERS
     // =========================================================================
@@ -900,6 +938,42 @@ public static class YSharpParser
         select new AppDecl(moduleName.ToStringValue(), mainFn, keyword.Span);
 
     // =========================================================================
+    // HTTP ROUTING
+    // =========================================================================
+
+    /// <summary>
+    /// HTTP method: get, post, put, delete
+    /// </summary>
+    private static TokenListParser<YSharpToken, Ast.HttpMethod> HttpMethodParser { get; } =
+        Token.EqualTo(YSharpToken.Get).Select(_ => Ast.HttpMethod.Get)
+            .Or(Token.EqualTo(YSharpToken.Post).Select(_ => Ast.HttpMethod.Post))
+            .Or(Token.EqualTo(YSharpToken.Put).Select(_ => Ast.HttpMethod.Put))
+            .Or(Token.EqualTo(YSharpToken.Delete).Select(_ => Ast.HttpMethod.Delete));
+
+    /// <summary>
+    /// Route endpoint: get "/" => handler ~modifiers;
+    /// </summary>
+    private static TokenListParser<YSharpToken, RouteEndpoint> RouteEndpoint { get; } =
+        from method in HttpMethodParser
+        from path in Token.EqualTo(YSharpToken.String)
+        from arrow in Token.EqualTo(YSharpToken.FatArrow)
+        from handler in Token.EqualTo(YSharpToken.Identifier)
+        from mods in Modifiers
+        from semi in Token.EqualTo(YSharpToken.Semicolon)
+        select new RouteEndpoint(method, path.ToStringValue().Trim('"'), handler.ToStringValue(), mods, path.Span);
+
+    /// <summary>
+    /// Route declaration: route "/users" { endpoints }
+    /// </summary>
+    private static TokenListParser<YSharpToken, RouteDecl> Route { get; } =
+        from keyword in Token.EqualTo(YSharpToken.Route)
+        from basePath in Token.EqualTo(YSharpToken.String)
+        from lbrace in Token.EqualTo(YSharpToken.LBrace)
+        from endpoints in RouteEndpoint.Many()
+        from rbrace in Token.EqualTo(YSharpToken.RBrace)
+        select new RouteDecl(basePath.ToStringValue().Trim('"'), endpoints.ToList(), keyword.Span);
+
+    // =========================================================================
     // FUNCTIONS
     // =========================================================================
 
@@ -957,9 +1031,11 @@ public static class YSharpParser
             .Or(Class.Select(c => (Decl)c))
             .Or(Interface.Select(i => (Decl)i))
             .Or(Enum.Select(e => (Decl)e))
+            .Or(Error.Select(e => (Decl)e))
             .Or(Service.Select(s => (Decl)s))
             .Or(Module.Select(m => (Decl)m))
             .Or(App.Select(a => (Decl)a))
+            .Or(Route.Select(r => (Decl)r))
             .Or(Function.Select(f => (Decl)f));
 
     /// <summary>A complete program: list of declarations</summary>
