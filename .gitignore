@@ -1,0 +1,16 @@
+# Dotfiles (except .gitignore)
+.*
+!.gitignore
+
+# Markdown notes
+*.md
+
+# .NET build outputs
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+
+# Native binaries (Y# compiler output)
+hello
