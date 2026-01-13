@@ -22,6 +22,7 @@ public class Transpiler(string assemblyName)
     private readonly HashSet<string> _typeNames = new();  // Track declared types for instantiation
     private readonly HashSet<string> _asyncFunctions = new();  // Track async functions for auto-await
     private int _tryCounter = 0;  // Counter for temporary variables in ? expressions
+    private int _concurrentTaskCounter = 0;  // Counter for task variables in concurrent blocks
 
     /// <summary>
     /// Returns true if the last Transpile call used DI features.
@@ -620,7 +621,6 @@ public class Transpiler(string assemblyName)
 
         var tasks = new List<(string varName, string taskName)>();
         var syncVars = new List<(string varName, Expr value)>();
-        var taskCounter = 0;
 
         // First pass: categorize statements as async or sync
         foreach (var stmt in concurrent.Statements)
@@ -631,7 +631,7 @@ public class Transpiler(string assemblyName)
                 if (IsAsyncCall(varDecl.Value))
                 {
                     var varName = varDecl.Name;
-                    var taskName = $"_task{taskCounter++}";
+                    var taskName = $"_task{_concurrentTaskCounter++}";
                     tasks.Add((varName, taskName));
 
                     // Start the task without awaiting

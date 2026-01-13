@@ -1,19 +1,56 @@
-// Test concurrent blocks with async functions
+// Test concurrent blocks for parallel async execution
 
+// Async functions (default - no ~blocking modifier)
 fn fetch_user(id: int) -> string {
-    return "User";
+    return $"User-{id}";
 }
 
 fn fetch_orders(id: int) -> string {
-    return "Orders";
+    return $"Orders-{id}";
+}
+
+fn fetch_profile(id: int) -> string {
+    return $"Profile-{id}";
+}
+
+// Sync function for comparison
+fn compute_value() -> int ~blocking {
+    return 42;
 }
 
 fn main() -> void {
-    // Fetch user and orders concurrently
+    // Test 1: Multiple async calls in concurrent block
     concurrent {
         let user = fetch_user(1);
         let orders = fetch_orders(1);
+        let profile = fetch_profile(1);
     };
 
-    print($"Got {user} and {orders}");
+    print($"Test 1 - Async calls: {user}, {orders}, {profile}");
+
+    // Test 2: Mixed sync and async in concurrent block
+    concurrent {
+        let data = fetch_user(2);
+        let value = 100;
+    };
+
+    print($"Test 2 - Mixed: {data}, {value}");
+
+    // Test 3: Single async call (still works)
+    concurrent {
+        let single = fetch_orders(3);
+    };
+
+    print($"Test 3 - Single: {single}");
+
+    // Test 4: Only sync values (no Task.WhenAll needed)
+    concurrent {
+        let a = 1;
+        let b = 2;
+        let c = 3;
+    };
+
+    print($"Test 4 - Sync only: {a}, {b}, {c}");
+
+    print("All concurrent tests passed!");
 }
