@@ -1,0 +1,24 @@
+// Test: HTTP routing
+
+fn list_users() -> string ~blocking {
+    return "List of users";
+}
+
+fn get_user(id: int) -> string ~blocking {
+    return $"User {id}";
+}
+
+fn create_user() -> string ~blocking {
+    return "User created";
+}
+
+fn delete_user(id: int) -> string ~blocking {
+    return $"User {id} deleted";
+}
+
+route "/users" {
+    get "/" => list_users;
+    get "/{id}" => get_user;
+    post "/" => create_user;
+    delete "/{id}" => delete_user;
+}

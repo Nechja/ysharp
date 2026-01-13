@@ -78,11 +78,12 @@ if (emitCSharp)
 try
 {
     var useDi = transpiler.UsesDependencyInjection;
+    var useWeb = transpiler.UsesHttpRoutes;
 
     if (buildBinary)
     {
         Console.WriteLine("Building native binary...");
-        Builder.BuildBinary(csharpCode, assemblyName, useDi);
+        Builder.BuildBinary(csharpCode, assemblyName, useDi, useWeb);
         Console.WriteLine();
         Console.WriteLine($"Output: ./{assemblyName}");
         Console.WriteLine($"Run:    ./{assemblyName}");
@@ -91,7 +92,7 @@ try
     {
         Console.WriteLine("Building...");
         var outputPath = Path.ChangeExtension(inputFile, ".dll");
-        Builder.BuildDll(csharpCode, outputPath, useDi);
+        Builder.BuildDll(csharpCode, outputPath, useDi, useWeb);
         Console.WriteLine();
         Console.WriteLine($"Output: {outputPath}");
         Console.WriteLine($"Run:    dotnet {outputPath}");

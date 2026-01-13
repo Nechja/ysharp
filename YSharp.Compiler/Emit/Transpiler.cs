@@ -18,6 +18,7 @@ public class Transpiler(string assemblyName)
     private int _indent = 0;
     private bool _usesResult = false;  // Track if Result<T> is used
     private bool _usesDi = false;      // Track if DI features are used
+    private bool _usesRoutes = false;  // Track if HTTP routes are used
     private readonly HashSet<string> _typeNames = new();  // Track declared types for instantiation
     private readonly HashSet<string> _asyncFunctions = new();  // Track async functions for auto-await
     private int _tryCounter = 0;  // Counter for temporary variables in ? expressions
@@ -27,6 +28,12 @@ public class Transpiler(string assemblyName)
     /// Builder uses this to add package references.
     /// </summary>
     public bool UsesDependencyInjection => _usesDi;
+
+    /// <summary>
+    /// Returns true if the last Transpile call used HTTP routes.
+    /// Builder uses this to use Web SDK.
+    /// </summary>
+    public bool UsesHttpRoutes => _usesRoutes;
 
     /// <summary>
     /// Transpile declarations to C# source code.
@@ -58,11 +65,21 @@ public class Transpiler(string assemblyName)
 
         // Check if DI features are used
         _usesDi = services.Any() || modules.Any() || appDecl != null;
+        _usesRoutes = routes.Any();
 
         // Emit using statements for DI if needed
         if (_usesDi)
         {
             AppendLine("using Microsoft.Extensions.DependencyInjection;");
+            AppendLine("");
+        }
+
+        // Emit using statements for HTTP routing if needed
+        if (_usesRoutes)
+        {
+            AppendLine("var builder = WebApplication.CreateBuilder(args);");
+            AppendLine("builder.WebHost.UseUrls(\"http://localhost:9900\");");
+            AppendLine("var app = builder.Build();");
             AppendLine("");
         }
 
@@ -120,13 +137,26 @@ public class Transpiler(string assemblyName)
             TranspileModule(mod);
         }
 
-        // 9. App entry point (if using DI)
+        // 9. Routes (HTTP endpoints)
+        foreach (var route in routes)
+        {
+            TranspileRoute(route);
+        }
+
+        // Start the web app if routes were defined
+        if (_usesRoutes)
+        {
+            AppendLine("app.Run();");
+            AppendLine("");
+        }
+
+        // 10. App entry point (if using DI)
         if (appDecl != null)
         {
             TranspileApp(appDecl);
         }
 
-        // 10. Result<T> type if used
+        // 11. Result<T> type if used
         if (_usesResult)
         {
             EmitResultType();
@@ -553,6 +583,28 @@ public class Transpiler(string assemblyName)
 
         _indent--;
         AppendLine("}");
+        AppendLine("");
+    }
+
+    private void TranspileRoute(RouteDecl route)
+    {
+        foreach (var endpoint in route.Endpoints)
+        {
+            var method = endpoint.Method switch
+            {
+                Ast.HttpMethod.Get => "MapGet",
+                Ast.HttpMethod.Post => "MapPost",
+                Ast.HttpMethod.Put => "MapPut",
+                Ast.HttpMethod.Delete => "MapDelete",
+                _ => "MapGet"
+            };
+
+            var fullPath = (route.BasePath.TrimEnd('/') + "/" + endpoint.Path.TrimStart('/')).TrimEnd('/');
+            if (string.IsNullOrEmpty(fullPath)) fullPath = "/";
+            fullPath = fullPath.Replace("//", "/");
+
+            AppendLine($"app.{method}(\"{fullPath}\", {Capitalize(endpoint.Handler)});");
+        }
         AppendLine("");
     }
 

@@ -10,7 +10,7 @@ public static class Builder
     /// <summary>
     /// Build to a .dll (requires dotnet to run).
     /// </summary>
-    public static void BuildDll(string csharpSource, string outputPath, bool useDi = false)
+    public static void BuildDll(string csharpSource, string outputPath, bool useDi = false, bool useWeb = false)
     {
         var assemblyName = Path.GetFileNameWithoutExtension(outputPath);
         var outputDir = Path.GetDirectoryName(Path.GetFullPath(outputPath)) ?? ".";
@@ -23,12 +23,13 @@ public static class Builder
         File.WriteAllText(Path.Combine(projectDir, "Program.cs"), csharpSource);
 
         // Write csproj
+        var sdk = useWeb ? "Microsoft.NET.Sdk.Web" : "Microsoft.NET.Sdk";
         var diPackage = useDi
             ? "\n    <PackageReference Include=\"Microsoft.Extensions.DependencyInjection\" Version=\"9.0.0\" />"
             : "";
 
         File.WriteAllText(Path.Combine(projectDir, $"{assemblyName}.csproj"), $"""
-            <Project Sdk="Microsoft.NET.Sdk">
+            <Project Sdk="{sdk}">
               <PropertyGroup>
                 <OutputType>Exe</OutputType>
                 <TargetFramework>net9.0</TargetFramework>
@@ -40,7 +41,7 @@ public static class Builder
             """);
 
         // Build (use publish when dependencies exist to include them)
-        if (useDi)
+        if (useDi || useWeb)
         {
             RunDotnet(projectDir, "publish -c Release --nologo -v q");
 
@@ -68,7 +69,7 @@ public static class Builder
     /// <summary>
     /// Build to a native binary (self-contained, no dotnet required).
     /// </summary>
-    public static void BuildBinary(string csharpSource, string outputPath, bool useDi = false)
+    public static void BuildBinary(string csharpSource, string outputPath, bool useDi = false, bool useWeb = false)
     {
         var assemblyName = Path.GetFileNameWithoutExtension(outputPath);
         var outputDir = Path.GetDirectoryName(Path.GetFullPath(outputPath)) ?? ".";
@@ -82,12 +83,13 @@ public static class Builder
         File.WriteAllText(Path.Combine(projectDir, "Program.cs"), csharpSource);
 
         // Write csproj
+        var sdk = useWeb ? "Microsoft.NET.Sdk.Web" : "Microsoft.NET.Sdk";
         var diPackage = useDi
             ? "\n    <PackageReference Include=\"Microsoft.Extensions.DependencyInjection\" Version=\"9.0.0\" />"
             : "";
 
         File.WriteAllText(Path.Combine(projectDir, $"{assemblyName}.csproj"), $"""
-            <Project Sdk="Microsoft.NET.Sdk">
+            <Project Sdk="{sdk}">
               <PropertyGroup>
                 <OutputType>Exe</OutputType>
                 <TargetFramework>net9.0</TargetFramework>
