@@ -1,0 +1,30 @@
+// Test modifier declarations with routes
+
+// Simple modifier with no config
+modifier auth {
+    fn apply(req: Request) -> Result<Request, HttpError> {
+        return Ok(req);
+    }
+}
+
+// Modifier with config param
+modifier role {
+    fn apply(required: string, req: Request) -> Result<Request, HttpError> {
+        return Ok(req);
+    }
+}
+
+// Handler functions
+fn get_users() -> string {
+    return "users";
+}
+
+fn get_admin_data() -> string {
+    return "admin data";
+}
+
+// Routes with modifiers
+route "/api" {
+    get "/users" => get_users;
+    get "/admin" => get_admin_data ~auth ~role("admin");
+}

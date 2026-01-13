@@ -23,6 +23,7 @@ public class Transpiler(string assemblyName)
     private readonly HashSet<string> _asyncFunctions = new();  // Track async functions for auto-await
     private int _tryCounter = 0;  // Counter for temporary variables in ? expressions
     private int _concurrentTaskCounter = 0;  // Counter for task variables in concurrent blocks
+    private readonly Dictionary<string, ModifierDecl> _modifiers = new();  // Track custom modifiers
 
     /// <summary>
     /// Returns true if the last Transpile call used DI features.
@@ -58,6 +59,13 @@ public class Transpiler(string assemblyName)
         var modules = declarations.OfType<ModuleDecl>();
         var appDecl = declarations.OfType<AppDecl>().FirstOrDefault();
         var routes = declarations.OfType<RouteDecl>();
+        var modifiers = declarations.OfType<ModifierDecl>();
+
+        // Collect modifiers for route filtering
+        foreach (var mod in modifiers)
+        {
+            _modifiers[mod.Name] = mod;
+        }
 
         // First pass - collect type names, async functions, and check if Result is used
         CollectTypeNames(declarations);
@@ -604,9 +612,58 @@ public class Transpiler(string assemblyName)
             if (string.IsNullOrEmpty(fullPath)) fullPath = "/";
             fullPath = fullPath.Replace("//", "/");
 
-            AppendLine($"app.{method}(\"{fullPath}\", {Capitalize(endpoint.Handler)});");
+            // Build the route with optional endpoint filters for modifiers
+            var routeBuilder = new StringBuilder();
+            routeBuilder.Append($"app.{method}(\"{fullPath}\", {Capitalize(endpoint.Handler)})");
+
+            // Add endpoint filters for each modifier
+            foreach (var mod in endpoint.Modifiers)
+            {
+                if (_modifiers.TryGetValue(mod.Name, out var modDecl))
+                {
+                    // Generate inline filter for the modifier
+                    routeBuilder.Append(GenerateEndpointFilter(modDecl, mod.Args));
+                }
+            }
+
+            routeBuilder.Append(";");
+            AppendLine(routeBuilder.ToString());
         }
         AppendLine("");
+    }
+
+    private string GenerateEndpointFilter(ModifierDecl modDecl, List<Expr>? args)
+    {
+        // Generate an AddEndpointFilter call with the modifier logic
+        var sb = new StringBuilder();
+        sb.Append(".AddEndpointFilter(async (context, next) => {");
+
+        // If modifier has config params, extract them from args
+        if (modDecl.ConfigParams.Count > 0 && args != null && args.Count > 0)
+        {
+            for (int i = 0; i < Math.Min(modDecl.ConfigParams.Count, args.Count); i++)
+            {
+                var param = modDecl.ConfigParams[i];
+                var argValue = TranspileExpressionToString(args[i]);
+                sb.Append($" var {param.Name} = {argValue}; ");
+            }
+        }
+
+        // Transpile the modifier body
+        // For now, just call next and return - full body transpilation would require more work
+        sb.Append(" return await next(context); })");
+
+        return sb.ToString();
+    }
+
+    private string TranspileExpressionToString(Expr expr)
+    {
+        // Helper to transpile an expression and return as string
+        var startPos = _sb.Length;
+        TranspileExpression(expr);
+        var result = _sb.ToString(startPos, _sb.Length - startPos);
+        _sb.Length = startPos;  // Reset to before the expression
+        return result;
     }
 
     private void TranspileConcurrent(ConcurrentExpr concurrent)

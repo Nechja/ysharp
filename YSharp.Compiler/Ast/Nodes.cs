@@ -456,3 +456,21 @@ public record RouteDecl(
     List<RouteEndpoint> Endpoints,
     TextSpan Span
 ) : Decl(Span);
+
+/// <summary>
+/// Modifier declaration: modifier auth { fn apply(req: Request) -> Result&lt;Request, HttpError&gt; { } }
+/// Modifiers are middleware - they can have dependencies and config parameters.
+///
+/// Example:
+///   modifier rate_limit {
+///       limiter: RateLimiter;  // injected dependency
+///       fn apply(max: int, window: int)(req: Request) -> Result&lt;Request, HttpError&gt; { }
+///   }
+/// </summary>
+public record ModifierDecl(
+    string Name,
+    List<ClassField> Dependencies,  // Injected dependencies (fields)
+    List<Param> ConfigParams,       // Config params from apply(params)(req)
+    BlockStmt Body,                 // The apply function body
+    TextSpan Span
+) : Decl(Span);

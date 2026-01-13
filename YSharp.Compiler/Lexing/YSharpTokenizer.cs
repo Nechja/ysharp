@@ -180,6 +180,7 @@ public static class YSharpTokenizer
             .Match(Span.EqualTo("post"), YSharpToken.Post, requireDelimiters: true)
             .Match(Span.EqualTo("put"), YSharpToken.Put, requireDelimiters: true)
             .Match(Span.EqualTo("delete"), YSharpToken.Delete, requireDelimiters: true)
+            .Match(Span.EqualTo("modifier"), YSharpToken.ModifierKw, requireDelimiters: true)
             .Match(Span.EqualTo("int"), YSharpToken.Int, requireDelimiters: true)
             .Match(Span.EqualTo("long"), YSharpToken.Long, requireDelimiters: true)
             .Match(Span.EqualTo("float"), YSharpToken.Float, requireDelimiters: true)
@@ -239,6 +240,7 @@ public static class YSharpTokenizer
         ["post"] = YSharpToken.Post,
         ["put"] = YSharpToken.Put,
         ["delete"] = YSharpToken.Delete,
+        ["modifier"] = YSharpToken.ModifierKw,
         ["int"] = YSharpToken.Int,
         ["long"] = YSharpToken.Long,
         ["float"] = YSharpToken.Float,

@@ -73,6 +73,7 @@ public enum YSharpToken
     Post,       // post - HTTP POST method
     Put,        // put - HTTP PUT method
     Delete,     // delete - HTTP DELETE method
+    ModifierKw, // modifier - custom middleware declaration
 
     // ===== Type Keywords =====
     // Built-in type names

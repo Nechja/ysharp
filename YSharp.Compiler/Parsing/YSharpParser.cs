@@ -986,6 +986,45 @@ public static class YSharpParser
         select new RouteDecl(basePath.ToStringValue().Trim('"'), endpoints.ToList(), keyword.Span);
 
     // =========================================================================
+    // MODIFIERS (MIDDLEWARE)
+    // =========================================================================
+
+    /// <summary>
+    /// Modifier dependency field: limiter: RateLimiter;
+    /// </summary>
+    private static TokenListParser<YSharpToken, ClassField> ModifierField { get; } =
+        from name in Token.EqualTo(YSharpToken.Identifier)
+        from colon in Token.EqualTo(YSharpToken.Colon)
+        from type in TypeReference
+        from semi in Token.EqualTo(YSharpToken.Semicolon)
+        select new ClassField(false, name.ToStringValue(), type, null, name.Span);
+
+    /// <summary>
+    /// Modifier apply function: fn apply(config_params, req: Request) -> Result&lt;Request, HttpError&gt; { body }
+    /// Config params are all params except the last one (req: Request).
+    /// </summary>
+    private static TokenListParser<YSharpToken, (List<Param> ConfigParams, BlockStmt Body)> ModifierApply { get; } =
+        from fn in Token.EqualTo(YSharpToken.Fn)
+        from apply in Token.EqualTo(YSharpToken.Identifier).Where(t => t.ToStringValue() == "apply")
+        from parms in Parameters
+        from arrow in Token.EqualTo(YSharpToken.Arrow)
+        from retType in TypeReference
+        from body in Block
+        select (parms.Count > 1 ? parms.Take(parms.Count - 1).ToList() : new List<Param>(), body);
+
+    /// <summary>
+    /// Modifier declaration: modifier auth { fields; fn apply(...) { } }
+    /// </summary>
+    private static TokenListParser<YSharpToken, ModifierDecl> ModifierDeclParser { get; } =
+        from keyword in Token.EqualTo(YSharpToken.ModifierKw)
+        from name in Token.EqualTo(YSharpToken.Identifier)
+        from lbrace in Token.EqualTo(YSharpToken.LBrace)
+        from fields in ModifierField.Try().Many()
+        from applyFn in ModifierApply
+        from rbrace in Token.EqualTo(YSharpToken.RBrace)
+        select new ModifierDecl(name.ToStringValue(), fields.ToList(), applyFn.ConfigParams, applyFn.Body, keyword.Span);
+
+    // =========================================================================
     // FUNCTIONS
     // =========================================================================
 
@@ -1048,6 +1087,7 @@ public static class YSharpParser
             .Or(Module.Select(m => (Decl)m))
             .Or(App.Select(a => (Decl)a))
             .Or(Route.Select(r => (Decl)r))
+            .Or(ModifierDeclParser.Select(m => (Decl)m))
             .Or(Function.Select(f => (Decl)f));
 
     /// <summary>A complete program: list of declarations</summary>
