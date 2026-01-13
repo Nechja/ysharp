@@ -416,6 +416,12 @@ public record AppDecl(
 /// </summary>
 public record ScopeExpr(List<Stmt> Statements, TextSpan Span) : Expr(Span);
 
+/// <summary>
+/// Concurrent block: concurrent { statements }
+/// Runs all statements in parallel using Task.WhenAll.
+/// </summary>
+public record ConcurrentExpr(List<Stmt> Statements, TextSpan Span) : Expr(Span);
+
 // =============================================================================
 // HTTP ROUTING
 // =============================================================================

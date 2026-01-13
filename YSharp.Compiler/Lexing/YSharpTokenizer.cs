@@ -164,6 +164,7 @@ public static class YSharpTokenizer
             .Match(Span.EqualTo("continue"), YSharpToken.Continue, requireDelimiters: true)
             .Match(Span.EqualTo("with"), YSharpToken.With, requireDelimiters: true)
             .Match(Span.EqualTo("blocking"), YSharpToken.Blocking, requireDelimiters: true)
+            .Match(Span.EqualTo("concurrent"), YSharpToken.Concurrent, requireDelimiters: true)
             .Match(Span.EqualTo("service"), YSharpToken.Service, requireDelimiters: true)
             .Match(Span.EqualTo("singleton"), YSharpToken.Singleton, requireDelimiters: true)
             .Match(Span.EqualTo("scoped"), YSharpToken.Scoped, requireDelimiters: true)
@@ -222,6 +223,7 @@ public static class YSharpTokenizer
         ["continue"] = YSharpToken.Continue,
         ["with"] = YSharpToken.With,
         ["blocking"] = YSharpToken.Blocking,
+        ["concurrent"] = YSharpToken.Concurrent,
         ["service"] = YSharpToken.Service,
         ["singleton"] = YSharpToken.Singleton,
         ["scoped"] = YSharpToken.Scoped,

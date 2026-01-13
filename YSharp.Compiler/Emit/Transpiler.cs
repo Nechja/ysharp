@@ -608,6 +608,146 @@ public class Transpiler(string assemblyName)
         AppendLine("");
     }
 
+    private void TranspileConcurrent(ConcurrentExpr concurrent)
+    {
+        // For each statement, we need to:
+        // 1. Start async tasks without awaiting
+        // 2. Run Task.WhenAll to wait for all
+        // 3. Extract results into variables
+        //
+        // Only async function calls are treated as concurrent tasks.
+        // Non-async expressions are evaluated normally.
+
+        var tasks = new List<(string varName, string taskName)>();
+        var syncVars = new List<(string varName, Expr value)>();
+        var taskCounter = 0;
+
+        // First pass: categorize statements as async or sync
+        foreach (var stmt in concurrent.Statements)
+        {
+            if (stmt is VarDeclStmt varDecl)
+            {
+                // Check if the value is an async call
+                if (IsAsyncCall(varDecl.Value))
+                {
+                    var varName = varDecl.Name;
+                    var taskName = $"_task{taskCounter++}";
+                    tasks.Add((varName, taskName));
+
+                    // Start the task without awaiting
+                    Append($"var {taskName} = ");
+                    TranspileExpressionNoAwait(varDecl.Value);
+                    _sb.AppendLine(";");
+                }
+                else
+                {
+                    // Sync value - just transpile normally
+                    syncVars.Add((varDecl.Name, varDecl.Value));
+                }
+            }
+            else
+            {
+                // Non-var-decl statements, transpile normally
+                TranspileStatement(stmt);
+            }
+        }
+
+        // Run all async tasks concurrently
+        if (tasks.Count > 0)
+        {
+            AppendLine($"await Task.WhenAll({string.Join(", ", tasks.Select(t => t.taskName))});");
+
+            // Extract results into variables
+            foreach (var (varName, taskName) in tasks)
+            {
+                AppendLine($"var {varName} = {taskName}.Result;");
+            }
+        }
+
+        // Emit sync variable declarations
+        foreach (var (varName, value) in syncVars)
+        {
+            Append($"var {varName} = ");
+            TranspileExpression(value);
+            _sb.AppendLine(";");
+        }
+    }
+
+    private bool IsAsyncCall(Expr expr)
+    {
+        // Check if the expression is a call to an async function
+        if (expr is CallExpr call)
+        {
+            if (call.Target is IdentifierExpr id)
+            {
+                return _asyncFunctions.Contains(id.Name);
+            }
+            if (call.Target is MemberAccessExpr member && member.Target is IdentifierExpr targetId)
+            {
+                // Check for method calls like service.method()
+                return _asyncFunctions.Contains($"{targetId.Name}.{member.Member}");
+            }
+        }
+        return false;
+    }
+
+    private void TranspileBlockingStmt(BlockingExpr blocking)
+    {
+        // Blocking block as a statement - execute statements synchronously
+        foreach (var stmt in blocking.Statements)
+        {
+            TranspileStatement(stmt);
+        }
+    }
+
+    private void TranspileExpressionNoAwait(Expr expr)
+    {
+        // Transpile expression without adding await for top-level calls
+        // This is used in concurrent blocks where we want to start tasks
+        switch (expr)
+        {
+            case CallExpr call:
+                // For calls, don't await - we want the Task
+                TranspileCallNoAwait(call);
+                break;
+            default:
+                // For other expressions, just transpile normally
+                TranspileExpression(expr);
+                break;
+        }
+    }
+
+    private void TranspileCallNoAwait(CallExpr call)
+    {
+        // Similar to TranspileCall but doesn't add await
+        switch (call.Target)
+        {
+            case IdentifierExpr id:
+                var typeArgs = call.TypeArgs.Count > 0
+                    ? $"<{string.Join(", ", call.TypeArgs.Select(TranspileType))}>"
+                    : "";
+                _sb.Append($"{Capitalize(id.Name)}{typeArgs}");
+                _sb.Append("(");
+                TranspileArgs(call.Args);
+                _sb.Append(")");
+                return;
+
+            case MemberAccessExpr member:
+                TranspileExpression(member.Target);
+                _sb.Append($".{Capitalize(member.Member)}(");
+                TranspileArgs(call.Args);
+                _sb.Append(")");
+                return;
+
+            default:
+                TranspileExpression(call.Target);
+                _sb.Append("(");
+                TranspileArgs(call.Args);
+                _sb.Append(")");
+                break;
+        }
+    }
+
     private void TranspileApp(AppDecl app)
     {
         // Generate a Main method that sets up DI
@@ -773,6 +913,16 @@ public class Transpiler(string assemblyName)
                 if (expr.Expression is TryExpr tryExpr)
                 {
                     TranspileTryStmt(tryExpr);
+                }
+                // Handle concurrent expression specially - it emits full statements
+                else if (expr.Expression is ConcurrentExpr concurrentExpr)
+                {
+                    TranspileConcurrent(concurrentExpr);
+                }
+                // Handle blocking expression specially - it's executed for side effects
+                else if (expr.Expression is BlockingExpr blockingExpr)
+                {
+                    TranspileBlockingStmt(blockingExpr);
                 }
                 else
                 {
@@ -1070,6 +1220,11 @@ public class Transpiler(string assemblyName)
                 }
                 _indent--;
                 Append("}))()");
+                break;
+
+            case ConcurrentExpr concurrentExpr:
+                // Concurrent expression: runs statements in parallel using Task.WhenAll
+                TranspileConcurrent(concurrentExpr);
                 break;
 
             case WithExpr withExpr:

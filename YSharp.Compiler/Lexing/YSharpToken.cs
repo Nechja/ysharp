@@ -53,6 +53,7 @@ public enum YSharpToken
     Continue,   // continue - skip to next iteration
     With,       // with - record copy with modifications
     Blocking,   // blocking - synchronous block expression
+    Concurrent, // concurrent - parallel I/O block
 
     // ===== Dependency Injection Keywords =====
     Service,    // service - DI service declaration

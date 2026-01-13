@@ -1,0 +1,19 @@
+// Test concurrent blocks with async functions
+
+fn fetch_user(id: int) -> string {
+    return "User";
+}
+
+fn fetch_orders(id: int) -> string {
+    return "Orders";
+}
+
+fn main() -> void {
+    // Fetch user and orders concurrently
+    concurrent {
+        let user = fetch_user(1);
+        let orders = fetch_orders(1);
+    };
+
+    print($"Got {user} and {orders}");
+}

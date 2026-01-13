@@ -302,6 +302,17 @@ public static class YSharpParser
         select (Expr)new ScopeExpr(stmts.ToList(), keyword.Span);
 
     /// <summary>
+    /// Concurrent expression: concurrent { statements }
+    /// Runs all statements in parallel using Task.WhenAll.
+    /// </summary>
+    private static TokenListParser<YSharpToken, Expr> ConcurrentBlock { get; } =
+        from keyword in Token.EqualTo(YSharpToken.Concurrent)
+        from lbrace in Token.EqualTo(YSharpToken.LBrace)
+        from stmts in Parse.Ref(() => Statement).Many()
+        from rbrace in Token.EqualTo(YSharpToken.RBrace)
+        select (Expr)new ConcurrentExpr(stmts.ToList(), keyword.Span);
+
+    /// <summary>
     /// Primary expression - the "atoms" of expressions.
     /// These are the simplest expressions that don't contain operators.
     /// </summary>
@@ -309,6 +320,7 @@ public static class YSharpParser
         Match.Try()  // Try() because match starts with keyword, needs backtrack
             .Or(Blocking.Try())  // Try() because blocking starts with keyword
             .Or(ScopeBlock.Try())  // Try() for scope keyword
+            .Or(ConcurrentBlock.Try())  // Try() for concurrent keyword
             .Or(SomeExpr.Try())  // Some(value)
             .Or(ArrayLiteral)
             .Or(DoubleLiteral)  // Must come before IntLiteral
