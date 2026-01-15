@@ -1,0 +1,25 @@
+// Test service declarations
+
+interface ILogger {
+    fn log(msg: string) -> void;
+}
+
+// Singleton service
+service singleton ConsoleLogger : ILogger {
+    fn log(msg: string) -> void {
+        print($"[LOG] {msg}");
+    }
+}
+
+// Module binds interface to implementation
+module TestModule {
+    bind ILogger => ConsoleLogger;
+}
+
+// App with injected service
+app TestModule {
+    fn main(logger: ILogger) -> void {
+        print("Service test starting");
+        print("Service test complete");
+    }
+}

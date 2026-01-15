@@ -1,0 +1,37 @@
+// Test record declarations and usage
+
+// Simple record
+record Point {
+    x: int;
+    y: int;
+}
+
+// Record with more fields
+record User {
+    name: string;
+    age: int;
+    active: bool;
+}
+
+fn main() -> void {
+    // Create record instances (positional syntax)
+    let p = Point(10, 20);
+    print($"Point: ({p.X}, {p.Y})");
+
+    // Record with all fields
+    let user = User("Alice", 30, true);
+    print($"User: {user.Name}, age {user.Age}, active: {user.Active}");
+
+    // With expression (copy with modification)
+    let p2 = p with { x: 100 };
+    print($"Modified point: ({p2.X}, {p2.Y})");
+
+    // Multiple with modifications
+    let user2 = user with { name: "Bob", active: false };
+    print($"Modified user: {user2.Name}, active: {user2.Active}");
+
+    // Original unchanged (immutability)
+    print($"Original point still: ({p.X}, {p.Y})");
+
+    print("All record tests passed!");
+}

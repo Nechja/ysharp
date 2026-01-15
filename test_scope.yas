@@ -1,0 +1,23 @@
+// Test scoped services
+
+interface INotifier {
+    fn notify(msg: string) -> void;
+}
+
+// Scoped service
+service scoped Notifier : INotifier {
+    fn notify(msg: string) -> void {
+        print($"[NOTIFY] {msg}");
+    }
+}
+
+module ScopeModule {
+    bind INotifier => Notifier;
+}
+
+app ScopeModule {
+    fn main(notifier: INotifier) -> void {
+        print("Scoped service test");
+        print("Test complete");
+    }
+}

@@ -373,21 +373,23 @@ public record ServiceDecl(
 
 /// <summary>
 /// Binding declaration: bind IService => MyService;
+/// Nested within ModuleDecl but inherits from Decl for consistency.
 /// </summary>
 public record BindingDecl(
     string Interface,
     string Implementation,
     TextSpan Span
-) : AstNode(Span);
+) : Decl(Span);
 
 /// <summary>
 /// Provide declaration: provide connection_string = env("DATABASE_URL");
+/// Nested within ModuleDecl but inherits from Decl for consistency.
 /// </summary>
 public record ProvideDecl(
     string Name,
     Expr Value,
     TextSpan Span
-) : AstNode(Span);
+) : Decl(Span);
 
 /// <summary>
 /// Module declaration: module Services [extends BaseModule] { bindings; provides; }
