@@ -1,4 +1,4 @@
-namespace YSharp.Compiler.Lexing;
+namespace YSharp.Core.Lexing;
 
 /// <summary>
 /// All token types in the Y# language.

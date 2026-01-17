@@ -1,7 +1,7 @@
 using System.Text;
-using YSharp.Compiler.Ast;
+using YSharp.Core.Ast;
 
-namespace YSharp.Compiler.Emit;
+namespace YSharp.Core.Emit;
 
 public partial class Transpiler
 {

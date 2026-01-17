@@ -1,10 +1,10 @@
 using Superpower;
 using Superpower.Model;
 using Superpower.Parsers;
-using YSharp.Compiler.Ast;
-using YSharp.Compiler.Lexing;
+using YSharp.Core.Ast;
+using YSharp.Core.Lexing;
 
-namespace YSharp.Compiler.Parsing;
+namespace YSharp.Core.Parsing;
 
 /// <summary>
 /// Parses Y# tokens into an AST.

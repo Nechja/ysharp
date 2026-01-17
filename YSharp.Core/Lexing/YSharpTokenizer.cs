@@ -3,7 +3,7 @@ using Superpower.Model;
 using Superpower.Parsers;
 using Superpower.Tokenizers;
 
-namespace YSharp.Compiler.Lexing;
+namespace YSharp.Core.Lexing;
 
 /// <summary>
 /// Turns Y# source code into a stream of tokens.

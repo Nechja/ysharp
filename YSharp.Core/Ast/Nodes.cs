@@ -1,6 +1,6 @@
 using Superpower.Model;
 
-namespace YSharp.Compiler.Ast;
+namespace YSharp.Core.Ast;
 
 /// <summary>
 /// Base class for all AST nodes.
