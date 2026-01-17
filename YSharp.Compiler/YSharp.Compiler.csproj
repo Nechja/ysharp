@@ -12,4 +12,8 @@
     <PackageReference Include="Superpower" Version="3.1.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\YSharp.Core\YSharp.Core.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -1,7 +1,8 @@
 using Superpower;
 using YSharp.Compiler.Emit;
-using YSharp.Compiler.Lexing;
-using YSharp.Compiler.Parsing;
+using YSharp.Core.Emit;
+using YSharp.Core.Lexing;
+using YSharp.Core.Parsing;
 
 // =====================================================================
 // Y# Compiler
