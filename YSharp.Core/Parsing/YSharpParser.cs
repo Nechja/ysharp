@@ -178,11 +178,67 @@ public static class YSharpParser
 
     /// <summary>
     /// Parses a simple expression from text (for interpolated strings).
-    /// Handles: identifiers, member access (a.b.c), function calls (foo())
+    /// Handles: identifiers, member access (a.b.c), function calls (foo()), binary ops (+, -, *, /)
     /// </summary>
     private static Expr ParseSimpleExpression(string text, TextSpan span)
     {
         text = text.Trim();
+
+        // Handle binary operators (low precedence first: +, -)
+        // Find operator not inside parentheses, scanning right to left for left associativity
+        var parenDepth = 0;
+        for (var i = text.Length - 1; i >= 0; i--)
+        {
+            var c = text[i];
+            if (c == ')') parenDepth++;
+            else if (c == '(') parenDepth--;
+            else if (parenDepth == 0 && (c == '+' || c == '-') && i > 0)
+            {
+                // Make sure it's not a unary minus at the start
+                var left = text[..i].Trim();
+                var right = text[(i + 1)..].Trim();
+                if (!string.IsNullOrEmpty(left) && !string.IsNullOrEmpty(right))
+                {
+                    return new BinaryExpr(
+                        ParseSimpleExpression(left, span),
+                        c.ToString(),
+                        ParseSimpleExpression(right, span),
+                        span);
+                }
+            }
+        }
+
+        // Handle *, / (higher precedence)
+        parenDepth = 0;
+        for (var i = text.Length - 1; i >= 0; i--)
+        {
+            var c = text[i];
+            if (c == ')') parenDepth++;
+            else if (c == '(') parenDepth--;
+            else if (parenDepth == 0 && (c == '*' || c == '/') && i > 0)
+            {
+                var left = text[..i].Trim();
+                var right = text[(i + 1)..].Trim();
+                if (!string.IsNullOrEmpty(left) && !string.IsNullOrEmpty(right))
+                {
+                    return new BinaryExpr(
+                        ParseSimpleExpression(left, span),
+                        c.ToString(),
+                        ParseSimpleExpression(right, span),
+                        span);
+                }
+            }
+        }
+
+        // Handle numeric literals
+        if (int.TryParse(text, out var intVal))
+        {
+            return new IntLiteralExpr(intVal, span);
+        }
+        if (double.TryParse(text, out var doubleVal))
+        {
+            return new DoubleLiteralExpr(doubleVal, span);
+        }
 
         // Handle function calls: name() or name(args)
         var parenIndex = text.IndexOf('(');

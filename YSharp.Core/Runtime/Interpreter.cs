@@ -12,6 +12,7 @@ public class Interpreter
     private readonly Dictionary<string, FnDecl> _functions = [];
     private readonly Dictionary<string, RecordDecl> _records = [];
     private readonly Dictionary<string, EnumDecl> _enums = [];
+    private readonly Dictionary<string, ErrorDecl> _errors = [];
     private readonly Stack<Scope> _scopes = new();
 
     public IReadOnlyList<string> Output => _output;
@@ -22,6 +23,7 @@ public class Interpreter
         _functions.Clear();
         _records.Clear();
         _enums.Clear();
+        _errors.Clear();
         _scopes.Clear();
         _scopes.Push(new Scope());
 
@@ -38,6 +40,9 @@ public class Interpreter
                     break;
                 case EnumDecl enm:
                     _enums[enm.Name] = enm;
+                    break;
+                case ErrorDecl err:
+                    _errors[err.Name] = err;
                     break;
             }
         }
@@ -59,17 +64,43 @@ public class Interpreter
             CurrentScope[fn.Params[i].Name] = args[i];
         }
 
+        // Check for modifiers
+        var hasLog = fn.Modifiers.Any(m => m.Name == "log");
+        var hasTimed = fn.Modifiers.Any(m => m.Name == "timed");
+        System.Diagnostics.Stopwatch? stopwatch = null;
+
+        // Pre-execution modifier behavior
+        if (hasLog)
+            _output.Add($"[log] entering {fn.Name}");
+        if (hasTimed)
+            stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
         try
         {
+            object? result = null;
             if (fn.Body != null)
             {
-                return ExecuteBlock(fn.Body);
+                var blockResult = ExecuteBlock(fn.Body);
+                if (blockResult is ReturnValue rv)
+                    result = rv.Value;
+                else if (blockResult is PropagateError pe)
+                    result = pe.Result;
+                else
+                    result = blockResult;
             }
             else if (fn.ExprBody != null)
             {
-                return Evaluate(fn.ExprBody);
+                result = Evaluate(fn.ExprBody);
             }
-            return null;
+
+            // Post-execution modifier behavior
+            stopwatch?.Stop();
+            if (hasTimed)
+                _output.Add($"[timed] {fn.Name} completed in {stopwatch!.ElapsedMilliseconds}ms");
+            if (hasLog)
+                _output.Add($"[log] exiting {fn.Name}");
+
+            return result;
         }
         finally
         {
@@ -82,9 +113,7 @@ public class Interpreter
         foreach (var stmt in block.Statements)
         {
             var result = ExecuteStatement(stmt);
-            if (result is ReturnValue rv)
-                return rv.Value;
-            if (result is BreakSignal or ContinueSignal)
+            if (result is ReturnValue or BreakSignal or ContinueSignal or PropagateError)
                 return result;
         }
         return null;
@@ -102,7 +131,10 @@ public class Interpreter
                 return new ReturnValue(ret.Value != null ? Evaluate(ret.Value) : null);
 
             case VarDeclStmt varDecl:
-                CurrentScope[varDecl.Name] = Evaluate(varDecl.Value);
+                var value = Evaluate(varDecl.Value);
+                if (value is PropagateError)
+                    return value;
+                CurrentScope[varDecl.Name] = value;
                 return null;
 
             case AssignStmt assign:
@@ -212,6 +244,9 @@ public class Interpreter
             case NoneExpr:
                 return null;
 
+            case SomeExpr some:
+                return Evaluate(some.Value);
+
             case IdentifierExpr id:
                 return GetVariable(id.Name);
 
@@ -250,6 +285,16 @@ public class Interpreter
 
             case LambdaExpr lambda:
                 return new LambdaValue(lambda, CaptureScope());
+
+            case TryExpr tryExpr:
+                var result = Evaluate(tryExpr.Operand);
+                if (result is ResultValue rv)
+                {
+                    if (rv.IsError)
+                        return new PropagateError(rv);
+                    return rv.Value;
+                }
+                return result;
 
             default:
                 return null;
@@ -339,6 +384,34 @@ public class Interpreter
                 instance.Fields[recordDecl.Fields[i].Name] = args[i];
             }
             return instance;
+        }
+
+        // Handle Error.Validation, Error.NotFound, etc. (built-in error types)
+        if (call.Target is MemberAccessExpr errorAccess &&
+            errorAccess.Target is IdentifierExpr errorId &&
+            errorId.Name == "Error")
+        {
+            var args = call.Args.Select(Evaluate).ToList();
+            var message = args.Count > 0 ? args[0]?.ToString() ?? "" : "";
+            return new ResultValue(null, new ErrorValue(errorAccess.Member, message));
+        }
+
+        // Handle custom error type construction (e.g., TrailError.PermitRequired(...))
+        if (call.Target is MemberAccessExpr customErrorAccess &&
+            customErrorAccess.Target is IdentifierExpr customErrorName &&
+            _errors.TryGetValue(customErrorName.Name, out var errorDecl))
+        {
+            var variant = errorDecl.Variants.FirstOrDefault(v => v.Name == customErrorAccess.Member);
+            if (variant != null)
+            {
+                var args = call.Args.Select(Evaluate).ToList();
+                var errorInstance = new CustomErrorInstance(customErrorName.Name, variant.Name);
+                for (int i = 0; i < variant.Fields.Count && i < args.Count; i++)
+                {
+                    errorInstance.Fields[variant.Fields[i].Name] = args[i];
+                }
+                return new ResultValue(null, errorInstance);
+            }
         }
 
         // Handle enum variant construction (no args = singleton)
@@ -490,6 +563,23 @@ public class Interpreter
         {
             return enumInst.Fields.GetValueOrDefault(member.Member);
         }
+
+        if (target is ResultValue result)
+        {
+            return member.Member switch
+            {
+                "IsOk" => result.IsOk,
+                "IsError" => result.IsError,
+                "Value" => result.Value,
+                "Error" => result.Error,
+                _ => null
+            };
+        }
+
+        // For non-ResultValue types, treat as Ok result (for functions returning Result<T>)
+        if (member.Member == "IsOk") return target != null;
+        if (member.Member == "IsError") return target == null;
+        if (member.Member == "Value") return target;
 
         return null;
     }
@@ -717,6 +807,7 @@ public class Interpreter
     private record ReturnValue(object? Value);
     private record BreakSignal;
     private record ContinueSignal;
+    private record PropagateError(ResultValue Result);
 }
 
 // Runtime value types
@@ -759,4 +850,40 @@ public class LambdaValue(LambdaExpr lambda, Dictionary<string, object?> captured
 {
     public LambdaExpr Lambda { get; } = lambda;
     public Dictionary<string, object?> CapturedScope { get; } = capturedScope;
+}
+
+public record ErrorValue(string Kind, string Message)
+{
+    public override string ToString() => $"Error.{Kind}(\"{Message}\")";
+}
+
+public class CustomErrorInstance(string errorType, string variantName)
+{
+    public string ErrorType { get; } = errorType;
+    public string VariantName { get; } = variantName;
+    public Dictionary<string, object?> Fields { get; } = [];
+
+    public override string ToString()
+    {
+        if (Fields.Count == 0)
+            return $"{ErrorType}.{VariantName}";
+        var fieldStr = string.Join(", ", Fields.Select(f => $"{f.Key}: {f.Value}"));
+        return $"{ErrorType}.{VariantName}({fieldStr})";
+    }
+}
+
+public class ResultValue
+{
+    public object? Value { get; }
+    public object? Error { get; }
+    public bool IsOk => Error == null;
+    public bool IsError => Error != null;
+
+    public ResultValue(object? value, object? error = null)
+    {
+        Value = value;
+        Error = error;
+    }
+
+    public override string ToString() => IsError ? Error!.ToString()! : Value?.ToString() ?? "null";
 }
