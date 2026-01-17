@@ -1,0 +1,37 @@
+// Regression test: HTTP keywords (get, post, put, delete) should work as method names
+// This was a bug where "get" was tokenized as YSharpToken.Get instead of an identifier
+
+interface IRepository {
+    fn get() -> int;
+    fn post() -> void;
+    fn put() -> void;
+    fn delete() -> void;
+}
+
+service singleton Repository : IRepository {
+    fn get() -> int {
+        return 42;
+    }
+    
+    fn post() -> void {
+        print("posted");
+    }
+    
+    fn put() -> void {
+        print("put");
+    }
+    
+    fn delete() -> void {
+        print("deleted");
+    }
+}
+
+class Counter(start: int) {
+    fn get() -> int {
+        return start;
+    }
+}
+
+fn main() -> void {
+    print("HTTP keywords as method names work!");
+}

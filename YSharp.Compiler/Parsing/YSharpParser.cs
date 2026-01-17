@@ -744,7 +744,7 @@ public static class YSharpParser
     /// <summary>Method signature: fn name(params) -> type;</summary>
     private static TokenListParser<YSharpToken, MethodSig> MethodSignature { get; } =
         from fn in Token.EqualTo(YSharpToken.Fn)
-        from name in Token.EqualTo(YSharpToken.Identifier)
+        from name in Parse.Ref(() => FunctionName)
         from parms in Parameters
         from arrow in Token.EqualTo(YSharpToken.Arrow)
         from retType in TypeReference
@@ -1039,11 +1039,22 @@ public static class YSharpParser
         .OptionalOrDefault(new List<string>());
 
     /// <summary>
+    /// Function name: identifier or HTTP method keywords (get, post, put, delete)
+    /// These are reserved for routes but should be allowed as regular function names.
+    /// </summary>
+    private static TokenListParser<YSharpToken, Token<YSharpToken>> FunctionName { get; } =
+        Token.EqualTo(YSharpToken.Identifier)
+            .Or(Token.EqualTo(YSharpToken.Get))
+            .Or(Token.EqualTo(YSharpToken.Post))
+            .Or(Token.EqualTo(YSharpToken.Put))
+            .Or(Token.EqualTo(YSharpToken.Delete));
+
+    /// <summary>
     /// Function with block body: fn name&lt;T&gt;(params) -> type ~modifiers { body }
     /// </summary>
     private static TokenListParser<YSharpToken, FnDecl> FnWithBlock { get; } =
         from fn in Token.EqualTo(YSharpToken.Fn)
-        from name in Token.EqualTo(YSharpToken.Identifier)
+        from name in FunctionName
         from typeParams in TypeParams
         from parms in Parameters
         from arrow in Token.EqualTo(YSharpToken.Arrow)
@@ -1057,7 +1068,7 @@ public static class YSharpParser
     /// </summary>
     private static TokenListParser<YSharpToken, FnDecl> FnWithExpr { get; } =
         from fn in Token.EqualTo(YSharpToken.Fn)
-        from name in Token.EqualTo(YSharpToken.Identifier)
+        from name in FunctionName
         from typeParams in TypeParams
         from parms in Parameters
         from arrow in Token.EqualTo(YSharpToken.Arrow)
