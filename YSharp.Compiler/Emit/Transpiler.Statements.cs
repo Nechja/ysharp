@@ -4,44 +4,20 @@ namespace YSharp.Compiler.Emit;
 
 public partial class Transpiler
 {
-    private void TranspileStatement(Stmt stmt)
+    private void TranspileStatement(Stmt stmt) => (stmt switch
     {
-        switch (stmt)
-        {
-            case ExprStmt expr:
-                TranspileExprStmt(expr);
-                break;
-            case ReturnStmt ret:
-                TranspileReturn(ret);
-                break;
-            case BreakStmt:
-                AppendLine("break;");
-                break;
-            case ContinueStmt:
-                AppendLine("continue;");
-                break;
-            case IfStmt ifStmt:
-                TranspileIf(ifStmt);
-                break;
-            case VarDeclStmt varDecl:
-                TranspileVarDecl(varDecl);
-                break;
-            case ForStmt forStmt:
-                TranspileFor(forStmt);
-                break;
-            case AssignStmt assign:
-                TranspileAssign(assign);
-                break;
-            case CompoundAssignStmt compound:
-                TranspileCompoundAssign(compound);
-                break;
-            case BlockStmt block:
-                TranspileBlock(block);
-                break;
-            default:
-                throw new NotSupportedException($"Statement type not supported: {stmt.GetType().Name}");
-        }
-    }
+        ExprStmt expr => (Action)(() => TranspileExprStmt(expr)),
+        ReturnStmt ret => () => TranspileReturn(ret),
+        BreakStmt => () => AppendLine("break;"),
+        ContinueStmt => () => AppendLine("continue;"),
+        IfStmt ifStmt => () => TranspileIf(ifStmt),
+        VarDeclStmt varDecl => () => TranspileVarDecl(varDecl),
+        ForStmt forStmt => () => TranspileFor(forStmt),
+        AssignStmt assign => () => TranspileAssign(assign),
+        CompoundAssignStmt compound => () => TranspileCompoundAssign(compound),
+        BlockStmt block => () => TranspileBlock(block),
+        _ => throw new NotSupportedException($"Statement type not supported: {stmt.GetType().Name}")
+    })();
 
     private void TranspileBlock(BlockStmt block)
     {
@@ -53,26 +29,18 @@ public partial class Transpiler
         AppendLine("}");
     }
 
-    private void TranspileExprStmt(ExprStmt expr)
+    private void TranspileExprStmt(ExprStmt expr) => (expr.Expression switch
     {
-        switch (expr.Expression)
+        TryExpr tryExpr => (Action)(() => TranspileTryStmt(tryExpr)),
+        ConcurrentExpr concurrentExpr => () => TranspileConcurrent(concurrentExpr),
+        BlockingExpr blockingExpr => () => TranspileBlockingStmt(blockingExpr),
+        _ => () =>
         {
-            case TryExpr tryExpr:
-                TranspileTryStmt(tryExpr);
-                break;
-            case ConcurrentExpr concurrentExpr:
-                TranspileConcurrent(concurrentExpr);
-                break;
-            case BlockingExpr blockingExpr:
-                TranspileBlockingStmt(blockingExpr);
-                break;
-            default:
-                Append("");
-                TranspileExpression(expr.Expression);
-                _sb.AppendLine(";");
-                break;
+            Append("");
+            TranspileExpression(expr.Expression);
+            _sb.AppendLine(";");
         }
-    }
+    })();
 
     private void TranspileReturn(ReturnStmt ret)
     {
@@ -128,26 +96,29 @@ public partial class Transpiler
 
     private void TranspileFor(ForStmt forStmt)
     {
-        if (forStmt.Variable is null)
+        ((forStmt.Variable, forStmt.Iterable) switch
         {
-            Append("while (");
-            TranspileExpression(forStmt.Iterable);
-            _sb.AppendLine(")");
-        }
-        else if (forStmt.Iterable is RangeExpr range)
-        {
-            Append($"for (var {forStmt.Variable} = ");
-            TranspileExpression(range.Start);
-            _sb.Append($"; {forStmt.Variable} < ");
-            TranspileExpression(range.End);
-            _sb.AppendLine($"; {forStmt.Variable}++)");
-        }
-        else
-        {
-            Append($"foreach (var {forStmt.Variable} in ");
-            TranspileExpression(forStmt.Iterable);
-            _sb.AppendLine(")");
-        }
+            (null, _) => (Action)(() =>
+            {
+                Append("while (");
+                TranspileExpression(forStmt.Iterable);
+                _sb.AppendLine(")");
+            }),
+            (_, RangeExpr range) => () =>
+            {
+                Append($"for (var {forStmt.Variable} = ");
+                TranspileExpression(range.Start);
+                _sb.Append($"; {forStmt.Variable} < ");
+                TranspileExpression(range.End);
+                _sb.AppendLine($"; {forStmt.Variable}++)");
+            },
+            _ => () =>
+            {
+                Append($"foreach (var {forStmt.Variable} in ");
+                TranspileExpression(forStmt.Iterable);
+                _sb.AppendLine(")");
+            }
+        })();
 
         AppendLine("{");
         _indent++;

@@ -710,7 +710,7 @@ public static class YSharpParser
 
     /// <summary>Class member: either a field or a method</summary>
     private static TokenListParser<YSharpToken, object> ClassMember { get; } =
-        Parse.Ref(() => Function).Select(f => (object)f)
+        Parse.Ref(() => Function).Try().Select(f => (object)f)
             .Or(ClassField.Try().Select(f => (object)f));
 
     /// <summary>Interface list: : Interface1, Interface2</summary>

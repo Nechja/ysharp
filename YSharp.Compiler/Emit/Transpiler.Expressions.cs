@@ -4,86 +4,34 @@ namespace YSharp.Compiler.Emit;
 
 public partial class Transpiler
 {
-    private void TranspileExpression(Expr expr)
+    private void TranspileExpression(Expr expr) => (expr switch
     {
-        switch (expr)
-        {
-            case StringLiteralExpr str:
-                _sb.Append($"\"{Escape(str.Value)}\"");
-                break;
-            case InterpolatedStringExpr interp:
-                TranspileInterpolatedString(interp);
-                break;
-            case IntLiteralExpr num:
-                _sb.Append(num.Value);
-                break;
-            case DoubleLiteralExpr dbl:
-                _sb.Append(dbl.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                break;
-            case BoolLiteralExpr b:
-                _sb.Append(b.Value ? "true" : "false");
-                break;
-            case NoneExpr:
-                _sb.Append("null");
-                break;
-            case SomeExpr some:
-                TranspileExpression(some.Value);
-                break;
-            case IdentifierExpr id:
-                _sb.Append(id.Name);
-                break;
-            case BinaryExpr bin:
-                TranspileBinary(bin);
-                break;
-            case UnaryExpr unary:
-                TranspileUnary(unary);
-                break;
-            case TryExpr tryExpr:
-                TranspileTryExpr(tryExpr);
-                break;
-            case LambdaExpr lambda:
-                TranspileLambda(lambda);
-                break;
-            case CallExpr call:
-                TranspileCall(call);
-                break;
-            case MemberAccessExpr member:
-                TranspileMemberAccess(member);
-                break;
-            case ThisExpr:
-                _sb.Append("this");
-                break;
-            case WildcardExpr:
-                _sb.Append("_");
-                break;
-            case MatchExpr matchExpr:
-                TranspileMatch(matchExpr);
-                break;
-            case RangeExpr range:
-                TranspileRange(range);
-                break;
-            case ArrayExpr array:
-                TranspileArray(array);
-                break;
-            case IndexAccessExpr indexAccess:
-                TranspileIndexAccess(indexAccess);
-                break;
-            case BlockingExpr blockingExpr:
-                TranspileBlockingExpr(blockingExpr);
-                break;
-            case ConcurrentExpr concurrentExpr:
-                TranspileConcurrent(concurrentExpr);
-                break;
-            case WithExpr withExpr:
-                TranspileWith(withExpr);
-                break;
-            case ScopeExpr scopeExpr:
-                TranspileScope(scopeExpr);
-                break;
-            default:
-                throw new NotSupportedException($"Expression type not supported: {expr.GetType().Name}");
-        }
-    }
+        StringLiteralExpr str => (Action)(() => _sb.Append($"\"{Escape(str.Value)}\"")),
+        InterpolatedStringExpr interp => () => TranspileInterpolatedString(interp),
+        IntLiteralExpr num => () => _sb.Append(num.Value),
+        DoubleLiteralExpr dbl => () => _sb.Append(dbl.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+        BoolLiteralExpr b => () => _sb.Append(b.Value ? "true" : "false"),
+        NoneExpr => () => _sb.Append("null"),
+        SomeExpr some => () => TranspileExpression(some.Value),
+        IdentifierExpr id => () => _sb.Append(id.Name),
+        BinaryExpr bin => () => TranspileBinary(bin),
+        UnaryExpr unary => () => TranspileUnary(unary),
+        TryExpr tryExpr => () => TranspileTryExpr(tryExpr),
+        LambdaExpr lambda => () => TranspileLambda(lambda),
+        CallExpr call => () => TranspileCall(call),
+        MemberAccessExpr member => () => TranspileMemberAccess(member),
+        ThisExpr => () => _sb.Append("this"),
+        WildcardExpr => () => _sb.Append("_"),
+        MatchExpr matchExpr => () => TranspileMatch(matchExpr),
+        RangeExpr range => () => TranspileRange(range),
+        ArrayExpr array => () => TranspileArray(array),
+        IndexAccessExpr indexAccess => () => TranspileIndexAccess(indexAccess),
+        BlockingExpr blockingExpr => () => TranspileBlockingExpr(blockingExpr),
+        ConcurrentExpr concurrentExpr => () => TranspileConcurrent(concurrentExpr),
+        WithExpr withExpr => () => TranspileWith(withExpr),
+        ScopeExpr scopeExpr => () => TranspileScope(scopeExpr),
+        _ => throw new NotSupportedException($"Expression type not supported: {expr.GetType().Name}")
+    })();
 
     private void TranspileBinary(BinaryExpr bin)
     {
@@ -109,10 +57,9 @@ public partial class Transpiler
 
     private void TranspileLambda(LambdaExpr lambda)
     {
-        if (lambda.Parameters.Count == 1)
-            _sb.Append($"{lambda.Parameters[0]} => ");
-        else
-            _sb.Append($"({string.Join(", ", lambda.Parameters)}) => ");
+        _sb.Append(lambda.Parameters.Count == 1
+            ? $"{lambda.Parameters[0]} => "
+            : $"({string.Join(", ", lambda.Parameters)}) => ");
         TranspileExpression(lambda.Body);
     }
 
@@ -136,11 +83,14 @@ public partial class Transpiler
     private void TranspileArray(ArrayExpr array)
     {
         _sb.Append("new[] { ");
-        for (int i = 0; i < array.Elements.Count; i++)
+        _sb.Append(string.Join(", ", array.Elements.Select(e =>
         {
-            if (i > 0) _sb.Append(", ");
-            TranspileExpression(array.Elements[i]);
-        }
+            var start = _sb.Length;
+            TranspileExpression(e);
+            var result = _sb.ToString(start, _sb.Length - start);
+            _sb.Length = start;
+            return result;
+        })));
         _sb.Append(" }");
     }
 
@@ -172,13 +122,15 @@ public partial class Transpiler
     {
         TranspileExpression(withExpr.Base);
         _sb.Append(" with { ");
-        for (int i = 0; i < withExpr.Updates.Count; i++)
+        _sb.Append(string.Join(", ", withExpr.Updates.Select(u =>
         {
-            if (i > 0) _sb.Append(", ");
-            var (name, value) = withExpr.Updates[i];
-            _sb.Append($"{Capitalize(name)} = ");
-            TranspileExpression(value);
-        }
+            var start = _sb.Length;
+            _sb.Append($"{Capitalize(u.Name)} = ");
+            TranspileExpression(u.Value);
+            var result = _sb.ToString(start, _sb.Length - start);
+            _sb.Length = start;
+            return result;
+        })));
         _sb.Append(" }");
     }
 
@@ -199,17 +151,17 @@ public partial class Transpiler
         _sb.Append("$\"");
         foreach (var part in interp.Parts)
         {
-            switch (part)
+            (part switch
             {
-                case InterpolatedText text:
-                    _sb.Append(Escape(text.Text));
-                    break;
-                case InterpolatedExpr expr:
+                InterpolatedText text => (Action)(() => _sb.Append(Escape(text.Text))),
+                InterpolatedExpr expr => () =>
+                {
                     _sb.Append("{");
                     TranspileExpression(expr.Expression);
                     _sb.Append("}");
-                    break;
-            }
+                },
+                _ => () => { }
+            })();
         }
         _sb.Append("\"");
     }
@@ -218,11 +170,14 @@ public partial class Transpiler
     {
         TranspileExpression(match.Value);
         _sb.Append(" switch { ");
-        for (int i = 0; i < match.Arms.Count; i++)
+        _sb.Append(string.Join(", ", match.Arms.Select(arm =>
         {
-            if (i > 0) _sb.Append(", ");
-            TranspileMatchArm(match.Arms[i]);
-        }
+            var start = _sb.Length;
+            TranspileMatchArm(arm);
+            var result = _sb.ToString(start, _sb.Length - start);
+            _sb.Length = start;
+            return result;
+        })));
         _sb.Append(" }");
     }
 
@@ -239,33 +194,28 @@ public partial class Transpiler
             ? $"<{string.Join(", ", call.TypeArgs.Select(TranspileType))}>"
             : "";
 
-        if (call.Target is IdentifierExpr id)
+        (call.Target switch
         {
-            TranspileIdentifierCall(id, call, typeArgs);
-            return;
-        }
-
-        if (call.Target is MemberAccessExpr member)
-        {
-            TranspileMemberCall(member, call);
-            return;
-        }
-
-        TranspileExpression(call.Target);
-        _sb.Append("(");
-        TranspileArgs(call.Args);
-        _sb.Append(")");
+            IdentifierExpr id => (Action)(() => TranspileIdentifierCall(id, call, typeArgs)),
+            MemberAccessExpr member => () => TranspileMemberCall(member, call),
+            _ => () =>
+            {
+                TranspileExpression(call.Target);
+                _sb.Append("(");
+                TranspileArgs(call.Args);
+                _sb.Append(")");
+            }
+        })();
     }
 
     private void TranspileIdentifierCall(IdentifierExpr id, CallExpr call, string typeArgs)
     {
-        switch (id.Name)
+        if (id.Name == "print")
         {
-            case "print":
-                _sb.Append("Console.WriteLine(");
-                TranspileArgs(call.Args);
-                _sb.Append(")");
-                return;
+            _sb.Append("Console.WriteLine(");
+            TranspileArgs(call.Args);
+            _sb.Append(")");
+            return;
         }
 
         if (_typeNames.Contains(id.Name))
@@ -326,9 +276,8 @@ public partial class Transpiler
             {
                 if (IsCallAsync(varDecl.Value))
                 {
-                    var varName = varDecl.Name;
                     var taskName = $"_task{_concurrentTaskCounter++}";
-                    tasks.Add((varName, taskName));
+                    tasks.Add((varDecl.Name, taskName));
 
                     Append($"var {taskName} = ");
                     TranspileExpressionNoAwait(varDecl.Value);
@@ -369,32 +318,30 @@ public partial class Transpiler
             TranspileExpression(expr);
     }
 
-    private void TranspileCallNoAwait(CallExpr call)
+    private void TranspileCallNoAwait(CallExpr call) => (call.Target switch
     {
-        switch (call.Target)
+        IdentifierExpr id => (Action)(() =>
         {
-            case IdentifierExpr id:
-                var typeArgs = call.TypeArgs.Count > 0
-                    ? $"<{string.Join(", ", call.TypeArgs.Select(TranspileType))}>"
-                    : "";
-                _sb.Append($"{Capitalize(id.Name)}{typeArgs}(");
-                TranspileArgs(call.Args);
-                _sb.Append(")");
-                return;
-
-            case MemberAccessExpr member:
-                TranspileExpression(member.Target);
-                _sb.Append($".{Capitalize(member.Member)}(");
-                TranspileArgs(call.Args);
-                _sb.Append(")");
-                return;
-
-            default:
-                TranspileExpression(call.Target);
-                _sb.Append("(");
-                TranspileArgs(call.Args);
-                _sb.Append(")");
-                break;
+            var typeArgs = call.TypeArgs.Count > 0
+                ? $"<{string.Join(", ", call.TypeArgs.Select(TranspileType))}>"
+                : "";
+            _sb.Append($"{Capitalize(id.Name)}{typeArgs}(");
+            TranspileArgs(call.Args);
+            _sb.Append(")");
+        }),
+        MemberAccessExpr member => () =>
+        {
+            TranspileExpression(member.Target);
+            _sb.Append($".{Capitalize(member.Member)}(");
+            TranspileArgs(call.Args);
+            _sb.Append(")");
+        },
+        _ => () =>
+        {
+            TranspileExpression(call.Target);
+            _sb.Append("(");
+            TranspileArgs(call.Args);
+            _sb.Append(")");
         }
-    }
+    })();
 }
