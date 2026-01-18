@@ -13,6 +13,10 @@ public class Interpreter
     private readonly Dictionary<string, RecordDecl> _records = [];
     private readonly Dictionary<string, EnumDecl> _enums = [];
     private readonly Dictionary<string, ErrorDecl> _errors = [];
+    private readonly Dictionary<string, ServiceDecl> _services = [];
+    private readonly Dictionary<string, InterfaceDecl> _interfaces = [];
+    private readonly Dictionary<string, string> _bindings = []; // interface -> service
+    private readonly Dictionary<string, object> _singletons = [];
     private readonly Stack<Scope> _scopes = new();
 
     public IReadOnlyList<string> Output => _output;
@@ -24,6 +28,10 @@ public class Interpreter
         _records.Clear();
         _enums.Clear();
         _errors.Clear();
+        _services.Clear();
+        _interfaces.Clear();
+        _bindings.Clear();
+        _singletons.Clear();
         _scopes.Clear();
         _scopes.Push(new Scope());
 
@@ -44,11 +52,41 @@ public class Interpreter
                 case ErrorDecl err:
                     _errors[err.Name] = err;
                     break;
+                case ServiceDecl svc:
+                    _services[svc.Name] = svc;
+                    break;
+                case InterfaceDecl iface:
+                    _interfaces[iface.Name] = iface;
+                    break;
+                case ModuleDecl mod:
+                    // Register bindings from module
+                    foreach (var binding in mod.Bindings)
+                    {
+                        _bindings[binding.Interface] = binding.Implementation;
+                    }
+                    break;
             }
         }
 
-        // Execute main if it exists
-        if (_functions.TryGetValue("main", out var main))
+        // Check for app declaration (composition root with DI)
+        var appDecl = declarations.OfType<AppDecl>().FirstOrDefault();
+        if (appDecl != null)
+        {
+            // Resolve dependencies for app's main function
+            var args = new List<object?>();
+            foreach (var param in appDecl.MainFn.Params)
+            {
+                var typeName = param.Type switch
+                {
+                    NamedTypeRef named => named.Name,
+                    _ => ""
+                };
+                args.Add(ResolveService(typeName));
+            }
+            ExecuteFunction(appDecl.MainFn, args);
+        }
+        // Otherwise execute standalone main if it exists
+        else if (_functions.TryGetValue("main", out var main))
         {
             ExecuteFunction(main, []);
         }
@@ -374,6 +412,18 @@ public class Interpreter
             return null;
         }
 
+        // Handle resolve<Interface>() for DI
+        if (call.Target is IdentifierExpr { Name: "resolve" } && call.TypeArgs.Count > 0)
+        {
+            var typeArg = call.TypeArgs[0];
+            var interfaceName = typeArg switch
+            {
+                NamedTypeRef named => named.Name,
+                _ => typeArg.ToString() ?? ""
+            };
+            return ResolveService(interfaceName);
+        }
+
         // Handle record construction
         if (call.Target is IdentifierExpr id && _records.TryGetValue(id.Name, out var recordDecl))
         {
@@ -535,6 +585,52 @@ public class Interpreter
         {
             if (method == "toString")
                 return record.ToString();
+        }
+
+        // Service methods
+        if (target is ServiceInstance service)
+        {
+            return ExecuteServiceMethod(service, method, args);
+        }
+
+        // Result combinators - work on ResultValue or treat plain values as Ok
+        if (method == "Map" && args.Count > 0 && args[0] is LambdaValue mapLambda)
+        {
+            if (target is ResultValue rv)
+            {
+                if (rv.IsError) return rv;
+                var mapped = ExecuteLambda(mapLambda, [rv.Value]);
+                return new ResultValue(mapped);
+            }
+            // Plain value treated as Ok
+            var result = ExecuteLambda(mapLambda, [target]);
+            return new ResultValue(result);
+        }
+
+        if (method == "Then" && args.Count > 0 && args[0] is LambdaValue thenLambda)
+        {
+            if (target is ResultValue rv)
+            {
+                if (rv.IsError) return rv;
+                var result = ExecuteLambda(thenLambda, [rv.Value]);
+                // Then expects the lambda to return a Result
+                if (result is ResultValue) return result;
+                return new ResultValue(result);
+            }
+            // Plain value treated as Ok
+            var thenResult = ExecuteLambda(thenLambda, [target]);
+            if (thenResult is ResultValue) return thenResult;
+            return new ResultValue(thenResult);
+        }
+
+        if (method == "UnwrapOr" && args.Count > 0)
+        {
+            if (target is ResultValue rv)
+            {
+                return rv.IsOk ? rv.Value : args[0];
+            }
+            // Plain value treated as Ok, return the value
+            return target;
         }
 
         return null;
@@ -726,6 +822,74 @@ public class Interpreter
         return copy;
     }
 
+    private object? ResolveService(string interfaceName)
+    {
+        // Look up binding: interface -> service implementation
+        if (!_bindings.TryGetValue(interfaceName, out var serviceName))
+        {
+            // No binding found, try direct service lookup
+            serviceName = interfaceName;
+        }
+
+        if (!_services.TryGetValue(serviceName, out var serviceDecl))
+        {
+            return null;
+        }
+
+        // Check if singleton already exists
+        if (serviceDecl.Lifetime == ServiceLifetime.Singleton)
+        {
+            if (_singletons.TryGetValue(serviceName, out var existing))
+            {
+                return existing;
+            }
+        }
+
+        // Create service instance
+        var instance = new ServiceInstance(serviceDecl);
+
+        // Store singleton
+        if (serviceDecl.Lifetime == ServiceLifetime.Singleton)
+        {
+            _singletons[serviceName] = instance;
+        }
+
+        return instance;
+    }
+
+    private object? ExecuteServiceMethod(ServiceInstance service, string methodName, List<object?> args)
+    {
+        var method = service.ServiceDecl.Methods.FirstOrDefault(m => m.Name == methodName);
+        if (method == null) return null;
+
+        _scopes.Push(new Scope());
+        try
+        {
+            // Bind parameters
+            for (int i = 0; i < method.Params.Count && i < args.Count; i++)
+            {
+                CurrentScope[method.Params[i].Name] = args[i];
+            }
+
+            if (method.Body != null)
+            {
+                var result = ExecuteBlock(method.Body);
+                if (result is ReturnValue rv) return rv.Value;
+                return result;
+            }
+            else if (method.ExprBody != null)
+            {
+                return Evaluate(method.ExprBody);
+            }
+
+            return null;
+        }
+        finally
+        {
+            _scopes.Pop();
+        }
+    }
+
     private Scope CurrentScope => _scopes.Peek();
 
     private Dictionary<string, object?> CaptureScope()
@@ -886,4 +1050,11 @@ public class ResultValue
     }
 
     public override string ToString() => IsError ? Error!.ToString()! : Value?.ToString() ?? "null";
+}
+
+public class ServiceInstance(ServiceDecl serviceDecl)
+{
+    public ServiceDecl ServiceDecl { get; } = serviceDecl;
+
+    public override string ToString() => $"<{ServiceDecl.Name}>";
 }
