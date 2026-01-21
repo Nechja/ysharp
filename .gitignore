@@ -1,6 +1,7 @@
 # Dotfiles (except .gitignore)
 .*
 !.gitignore
+!.github
 
 # Markdown notes
 *.md
