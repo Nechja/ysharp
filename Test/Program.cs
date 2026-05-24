@@ -3,7 +3,7 @@ using Superpower;
 using YSharp.Core.Lexing;
 using YSharp.Core.Parsing;
 
-var json = File.ReadAllText("../YSharp.Playground/wwwroot/tour.json");
+var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "tour.json"));
 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 var tour = JsonSerializer.Deserialize<List<TourStep>>(json, options)!;
 

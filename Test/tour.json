@@ -1,0 +1,78 @@
+[
+  {
+    "title": "Hello World",
+    "code": "// Y# is a modern language that transpiles to C#\n// Functions use fn, types come after names\n\nfn main() -> void {\n    print(\"Hello, World!\");\n}"
+  },
+  {
+    "title": "Variables and Types",
+    "code": "fn main() -> void {\n    // Immutable with let\n    let trail = \"Cascade Pass\";\n    let miles = 7.4;\n    let gainFeet = 1800;\n    let isOpen = true;\n    \n    // Mutable with mut\n    mut hikedMiles = 0.0;\n    hikedMiles = hikedMiles + 3.7;\n    \n    // Type annotations when needed\n    let elevation: float = 5392.0;\n    \n    print($\"{trail}: {miles} miles, {gainFeet} ft gain\");\n}"
+  },
+  {
+    "title": "String Interpolation",
+    "code": "fn main() -> void {\n    let peak = \"Sahale Arm\";\n    let elevation = 7570;\n    \n    // Use $ prefix for interpolated strings\n    // Expressions go inside {}\n    print($\"Destination: {peak}\");\n    print($\"Summit elevation: {elevation} ft\");\n    print($\"Gain from trailhead: {elevation - 3600} ft\");\n}"
+  },
+  {
+    "title": "Functions",
+    "code": "// Return type comes after arrow\nfn totalGain(up: int, down: int) -> int ~blocking {\n    return up + down;\n}\n\n// Another function\nfn milesToKm(miles: float) -> float ~blocking {\n    return miles * 1.609;\n}\n\n// Void return type\nfn logTrail(name: string) -> void {\n    print($\"Now hiking: {name}\");\n}\n\nfn main() -> void {\n    let gain = totalGain(1800, 400);\n    print($\"Total elevation change: {gain} ft\");\n    print($\"7.4 miles = {milesToKm(7.4)} km\");\n}"
+  },
+  {
+    "title": "Unified For Loop",
+    "code": "fn main() -> void {\n    // Range loop (exclusive end)\n    print(\"Counting switchbacks:\");\n    for i in 1..6 {\n        print($\"Switchback {i}\");\n    }\n    \n    // Collection loop\n    print(\"Trail segments:\");\n    let segments = [\"Trailhead\", \"River crossing\", \"Summit\"];\n    for seg in segments {\n        print(seg);\n    }\n    \n    // While style with condition\n    print(\"Descending:\");\n    mut altitude = 6000;\n    for altitude > 5000 {\n        print($\"Elevation: {altitude} ft\");\n        altitude = altitude - 500;\n    }\n}"
+  },
+  {
+    "title": "Pattern Matching",
+    "code": "fn trailRating(difficulty: int) -> string ~blocking {\n    // Match expressions return values\n    // Arms end with semicolons\n    return match difficulty {\n        1 => \"Easy: Heather Meadows\";\n        2 => \"Moderate: Chain Lakes\";\n        3 => \"Hard: Ptarmigan Ridge\";\n        _ => \"Expert: Sahale Glacier\";\n    };\n}\n\nfn main() -> void {\n    for level in 1..5 {\n        print($\"Level {level}: {trailRating(level)}\");\n    }\n}"
+  },
+  {
+    "title": "Records",
+    "code": "// Records are immutable data types\nrecord Trail {\n    name: string;\n    miles: float;\n    gainFeet: int;\n}\n\nrecord Waypoint {\n    name: string;\n    elevation: int;\n}\n\nfn main() -> void {\n    let trail = Trail(\"Hidden Lake\", 8.0, 2900);\n    print($\"{trail.name}: {trail.miles} mi, {trail.gainFeet} ft\");\n    \n    // Use with to create modified copies\n    // Note: colon syntax for field assignment\n    let extended = trail with { miles: 10.5 };\n    print($\"Extended: {extended.miles} mi\");\n    \n    let summit = Waypoint(\"Hidden Lake Peak\", 7088);\n    print($\"{summit.name} at {summit.elevation} ft\");\n}"
+  },
+  {
+    "title": "Option Type",
+    "code": "// Option uses T? syntax\n// Some(value) for present, None for absent\n\nfn findTrail(id: int) -> string? {\n    if id == 1 {\n        return Some(\"Cascade Pass\");\n    }\n    if id == 2 {\n        return Some(\"Sahale Arm\");\n    }\n    return None;\n}\n\nfn main() -> void {\n    let trail1 = findTrail(1);\n    if trail1 != None {\n        print($\"Found: {trail1}\");\n    }\n    \n    let trail99 = findTrail(99);\n    if trail99 == None {\n        print(\"Trail not found in registry\");\n    }\n}"
+  },
+  {
+    "title": "Result Type",
+    "code": "// Result<T> for operations that may fail\n// Return value directly for success\n// Use Error.Validation for errors\n\nfn checkPermit(partySize: int) -> Result<int> ~blocking {\n    if partySize > 12 {\n        return Error.Validation(\"Party size exceeds limit\");\n    }\n    return partySize;\n}\n\nfn main() -> void {\n    let small = checkPermit(4);\n    print($\"Party of 4: {small}\");\n    \n    let large = checkPermit(15);\n    print($\"Party of 15: {large}\");\n}"
+  },
+  {
+    "title": "Error Propagation",
+    "code": "// Use ? to propagate errors up the call stack\n\nfn validateGroup(size: int) -> Result<int> ~blocking {\n    if size > 12 {\n        return Error.Validation(\"Group too large\");\n    }\n    return size;\n}\n\nfn issuePermit(size: int) -> Result<string> ~blocking {\n    let validSize = validateGroup(size)?;\n    return $\"Permit issued for {validSize} hikers\";\n}\n\nfn main() -> void {\n    let permit1 = issuePermit(6);\n    print($\"Result: {permit1}\");\n    \n    let permit2 = issuePermit(20);\n    print($\"Result: {permit2}\");\n}"
+  },
+  {
+    "title": "Error Types",
+    "code": "// Define domain specific errors\nerror TrailError {\n    Closed;\n    PermitRequired { zone: string; };\n    WeatherAlert { condition: string; level: int; };\n}\n\nfn checkAccess(zone: string) -> Result<string, TrailError> ~blocking {\n    if zone == \"Glacier\" {\n        return TrailError.PermitRequired(\"Glacier Zone\");\n    }\n    return $\"{zone} is open\";\n}\n\nfn main() -> void {\n    let result1 = checkAccess(\"Meadows\");\n    if result1.IsOk {\n        print($\"Access: {result1.Value}\");\n    }\n    \n    let result2 = checkAccess(\"Glacier\");\n    if result2.IsError {\n        print(\"Permit required for this zone\");\n    }\n}"
+  },
+  {
+    "title": "Algebraic Enums",
+    "code": "// Enums can carry data (tagged unions)\nenum Condition {\n    Clear;\n    Snowy { depth: int; };\n    Muddy;\n}\n\nfn main() -> void {\n    // Simple variant (no data)\n    let tomorrow = Condition.Clear;\n    print($\"Tomorrow: {tomorrow}\");\n    \n    // Variant with associated data\n    let today = Condition.Snowy(18);\n    print($\"Today: {today}\");\n    \n    let pikePlace = Condition.Muddy;\n    print($\"Pike Place Trail: {pikePlace}\");\n}"
+  },
+  {
+    "title": "Generics",
+    "code": "// Generic functions with type parameters\nfn first<T>(value: T) -> T ~blocking => value;\n\nfn formatPair<T, U>(a: T, b: U) -> string ~blocking {\n    return $\"({a}, {b})\";\n}\n\nfn main() -> void {\n    // Explicit type parameters on calls\n    let elev = first<int>(5392);\n    let trail = first<string>(\"Cascade Pass\");\n    \n    print($\"Elevation: {elev} ft\");\n    print($\"Trail: {trail}\");\n    \n    let coord = formatPair<float, float>(48.4756, -121.0574);\n    print($\"Coordinates: {coord}\");\n}"
+  },
+  {
+    "title": "Async First",
+    "code": "// Functions are async by default in Y#\n// No async keyword needed\n\nfn fetchWeather() -> string {\n    return \"Rain expected at Artist Point\";\n}\n\n// Use ~blocking when you need synchronous\nfn getElevation() -> int ~blocking {\n    return 5100;\n}\n\nfn main() -> void {\n    let weather = fetchWeather();\n    let trailhead = getElevation();\n    print($\"Weather: {weather}\");\n    print($\"Chain Lakes trailhead: {trailhead} ft\");\n}"
+  },
+  {
+    "title": "Function Modifiers",
+    "code": "// Modifiers add cross cutting concerns\n// Applied with ~ after return type\n\n// ~timed prints execution time\nfn logHike() -> void ~timed {\n    print(\"Logging hike data\");\n}\n\n// ~log prints enter/exit messages\nfn saveWaypoint() -> void ~log {\n    print(\"Saving GPS coordinates\");\n}\n\n// Multiple modifiers stack\nfn recordTrip() -> void ~log ~timed {\n    print(\"Recording trip report\");\n}\n\nfn main() -> void {\n    logHike();\n    saveWaypoint();\n    recordTrip();\n}"
+  },
+  {
+    "title": "Concurrent Block",
+    "code": "// Run operations in parallel with concurrent {}\n\nfn fetchTrailStatus(name: string) -> string {\n    return $\"{name}: Open but muddy\";\n}\n\nfn fetchWeather(zone: string) -> string {\n    return $\"{zone}: Rainy, 48F\";\n}\n\nfn fetchPermits(date: string) -> string {\n    return $\"{date}: Available\";\n}\n\nfn main() -> void {\n    // These run in parallel\n    concurrent {\n        let trail = fetchTrailStatus(\"Chain Lakes Loop\");\n        let weather = fetchWeather(\"Artist Point\");\n        let permits = fetchPermits(\"2024-07-15\");\n    };\n    \n    print($\"Trail: {trail}\");\n    print($\"Weather: {weather}\");\n    print($\"Permits: {permits}\");\n}"
+  },
+  {
+    "title": "Services and DI",
+    "code": "// Interfaces define contracts\ninterface ITrailService {\n    fn getInfo(name: string) -> string;\n}\n\n// Services implement interfaces\n// Lifetime: singleton, scoped, transient\nservice singleton TrailRegistry : ITrailService {\n    fn getInfo(name: string) -> string => $\"{name}: 7.4 mi, 1800 ft gain\";\n}\n\n// Module configures DI container\nmodule HikingModule {\n    bind ITrailService => TrailRegistry;\n}\n\nfn main() -> void {\n    // Resolve service from DI container\n    let trails = resolve<ITrailService>();\n    \n    // Call methods on the injected service\n    print(trails.getInfo(\"Cascade Pass\"));\n    print(trails.getInfo(\"Hidden Lake\"));\n}"
+  },
+  {
+    "title": "Result Combinators",
+    "code": "// Railway oriented programming with Result\n\nfn parseElevation(s: string) -> Result<int> ~blocking {\n    if s == \"5392\" { return 5392; }\n    return Error.Validation($\"Invalid elevation: {s}\");\n}\n\nfn validateAltitude(ft: int) -> Result<int> ~blocking {\n    if ft > 0 { return ft; }\n    return Error.Validation(\"Elevation must be positive\");\n}\n\nfn main() -> void {\n    // Map transforms success value\n    let meters = parseElevation(\"5392\").Map(ft => ft / 3.281);\n    print($\"In meters: {meters}\");\n    \n    // Then chains Result returning functions\n    let valid = parseElevation(\"5392\").Then(e => validateAltitude(e));\n    print($\"Validated: {valid}\");\n    \n    // UnwrapOr provides default on error\n    let elev = parseElevation(\"bad\").UnwrapOr(0);\n    print($\"With default: {elev}\");\n}"
+  },
+  {
+    "title": "App Composition",
+    "code": "// Interfaces and services\ninterface IWeatherService {\n    fn getForecast(zone: string) -> void;\n}\n\nservice singleton CascadesWeather : IWeatherService {\n    fn getForecast(zone: string) -> void {\n        print($\"[Weather] {zone}: Rain likely, bring layers\");\n    }\n}\n\n// Module wires up dependencies\nmodule CascadesModule {\n    bind IWeatherService => CascadesWeather;\n}\n\n// App is the composition root\napp CascadesModule {\n    fn main(weather: IWeatherService) -> void {\n        print(\"North Cascades Trail System Online\");\n        weather.getForecast(\"Artist Point\");\n        weather.getForecast(\"Cascade Pass\");\n    }\n}\n"
+  }
+]

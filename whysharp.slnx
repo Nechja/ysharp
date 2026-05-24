@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Test/Test.csproj" />
+  <Project Path="YSharp.Compiler/YSharp.Compiler.csproj" />
+  <Project Path="YSharp.Core/YSharp.Core.csproj" />
+</Solution>

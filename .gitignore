@@ -1,18 +1,24 @@
-# Dotfiles (except .gitignore)
-.*
-!.gitignore
-!.github
-
-# Markdown notes
-*.md
-
 # .NET build outputs
 bin/
 obj/
 *.dll
 *.exe
 *.pdb
-
-# Native binaries (Y# compiler output)
-hello
 publish/
+
+# Compiled Y# output (from running ysc against samples/)
+samples/**/*.deps.json
+samples/**/*.runtimeconfig.json
+samples/**/*.staticwebassets.endpoints.json
+# Native binaries from `ysc --bin` land next to their .yas source
+samples/*
+!samples/*.yas
+
+# Editor
+.vs/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
