@@ -1,0 +1,15 @@
+// Test if statements
+
+fn abs(n: int) -> int {
+    if n < 0 {
+        return 0 - n;
+    }
+    return n;
+}
+
+fn main() -> void {
+    let x = abs(5);
+    let y = abs(0 - 10);
+    print(x);
+    print(y);
+}

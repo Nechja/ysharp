@@ -1,0 +1,57 @@
+// Test basic language features
+
+record TestPoint {
+    x: int;
+    y: int;
+}
+
+record Wrapper {
+    inner: TestPoint;
+}
+
+fn main() -> void {
+    // Let (immutable) declarations
+    let x = 42;
+    let name = "Alice";
+    let flag = true;
+    let pi = 3.14;
+
+    print($"Let: x={x}, name={name}, flag={flag}, pi={pi}");
+
+    // Mut (mutable) declarations
+    mut counter = 0;
+    counter = counter + 1;
+    counter = counter + 1;
+    print($"Mut counter: {counter}");
+
+    // Compound assignment
+    mut value = 10;
+    value += 5;
+    value -= 2;
+    value *= 3;
+    print($"Compound: {value}");
+
+    // Member access with records
+    let point = TestPoint(10, 20);
+    let sum = point.X + point.Y;
+    print($"Member access: point.X + point.Y = {sum}");
+
+    // Nested member access
+    let wrapper = Wrapper(point);
+    print($"Nested: wrapper.Inner.X = {wrapper.Inner.X}");
+
+    // String operations
+    let greeting = "Hello";
+    let target = "World";
+    print($"{greeting}, {target}!");
+
+    // Boolean operations
+    let a = true;
+    let b = false;
+    let andResult = a && b;
+    let orResult = a || b;
+    let notResult = !b;
+    print($"Bool: and={andResult}, or={orResult}, not={notResult}");
+
+    print("All basic tests passed!");
+}

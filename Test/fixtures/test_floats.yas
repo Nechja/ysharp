@@ -1,0 +1,25 @@
+// Test: Float/Double literals
+
+fn main() -> void {
+    let pi = 3.14159;
+    let half = 0.5;
+    let hundred = 100.0;
+
+    print($"pi = {pi}");
+    print($"half = {half}");
+    print($"hundred = {hundred}");
+
+    // Arithmetic with doubles
+    let sum = pi + half;
+    print($"pi + half = {sum}");
+
+    let product = pi * 2.0;
+    print($"pi * 2.0 = {product}");
+
+    // Comparison
+    if pi > 3.0 {
+        print("pi is greater than 3");
+    }
+
+    print("Done!");
+}

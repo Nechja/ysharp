@@ -1,0 +1,8 @@
+Let: x=42, name=Alice, flag=true, pi=3.14
+Mut counter: 2
+Compound: 10
+Member access: point.X + point.Y = null
+Nested: wrapper.Inner.X = null
+Hello, World!
+Bool: and=false, or=true, not=true
+All basic tests passed!

@@ -1,0 +1,7 @@
+pi = 3.14159
+half = 0.5
+hundred = 100
+pi + half = 3.64159
+pi * 2.0 = 6.28318
+pi is greater than 3
+Done!

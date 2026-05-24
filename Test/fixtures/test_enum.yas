@@ -1,0 +1,18 @@
+// Test enum declarations (tagged unions)
+
+enum Status {
+    Pending;
+    Active;
+    Suspended;
+}
+
+enum OrderStatus {
+    Created;
+    Processing { order_id: int; };
+    Shipped { tracking: string; estimated_days: int; };
+    Delivered;
+}
+
+fn main() -> void {
+    print("Enums defined!");
+}

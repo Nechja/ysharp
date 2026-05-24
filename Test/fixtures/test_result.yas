@@ -1,0 +1,15 @@
+// Test Result<T> type with implicit conversion
+
+fn divide(a: int, b: int) -> Result<int> {
+    if b == 0 {
+        return Error.Validation("division by zero");
+    }
+    return a / b;
+}
+
+fn main() -> void {
+    let result1 = divide(10, 2);
+    let result2 = divide(10, 0);
+    print(result1);
+    print(result2);
+}

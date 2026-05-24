@@ -6,6 +6,9 @@
 
   <ItemGroup>
     <None Include="tour.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="fixtures\**\*.yas" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="fixtures\**\*.out" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="fixtures\**\*.err" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

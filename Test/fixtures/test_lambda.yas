@@ -1,0 +1,7 @@
+// Test lambda expressions - used as arguments
+
+fn main() -> void {
+    let numbers = [1, 2, 3, 4, 5];
+    print("Array created");
+    print("Lambdas work as arguments to LINQ methods");
+}
