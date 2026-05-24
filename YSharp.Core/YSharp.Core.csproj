@@ -4,6 +4,19 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <PackageId>YSharp.Core</PackageId>
+    <VersionPrefix>0.0.1</VersionPrefix>
+    <Authors>Kayla Graves</Authors>
+    <Description>Core lexer, parser, AST, transpiler, and interpreter for the Y# language.</Description>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Nechja/ysharp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Nechja/ysharp</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>

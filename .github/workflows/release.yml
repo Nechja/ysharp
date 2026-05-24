@@ -69,8 +69,32 @@ jobs:
           name: ysc-${{ matrix.rid }}
           path: ysc-${{ matrix.rid }}.*
 
+  nuget:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Pack YSharp.Core (stable)
+        run: >
+          dotnet pack YSharp.Core
+          --configuration Release
+          -p:Version=${GITHUB_REF_NAME#v}
+          -o packages
+
+      - name: Push to NuGet.org
+        run: >
+          dotnet nuget push "packages/*.nupkg"
+          --source https://api.nuget.org/v3/index.json
+          --api-key ${{ secrets.NUGET_API_KEY }}
+          --skip-duplicate
+
   release:
-    needs: publish
+    needs: [publish, nuget]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
