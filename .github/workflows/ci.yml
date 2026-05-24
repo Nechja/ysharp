@@ -29,6 +29,9 @@ jobs:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v6
 
@@ -43,9 +46,9 @@ jobs:
           --version-suffix preview.${{ github.run_number }}
           -o packages
 
-      - name: Push to NuGet.org
+      - name: Push to GitHub Packages
         run: >
           dotnet nuget push "packages/*.nupkg"
-          --source https://api.nuget.org/v3/index.json
-          --api-key ${{ secrets.NUGET_API_KEY }}
+          --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+          --api-key ${{ secrets.GITHUB_TOKEN }}
           --skip-duplicate
