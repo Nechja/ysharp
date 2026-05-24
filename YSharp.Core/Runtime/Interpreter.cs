@@ -179,6 +179,12 @@ public class Interpreter
                 SetVariable(assign.Target, Evaluate(assign.Value));
                 return null;
 
+            case CompoundAssignStmt compound:
+                var current = GetVariable(compound.Target);
+                var rhs = Evaluate(compound.Value);
+                SetVariable(compound.Target, ApplyBinaryOp(compound.Op, current, rhs));
+                return null;
+
             case IfStmt ifStmt:
                 var condition = Evaluate(ifStmt.Condition);
                 if (IsTruthy(condition))
@@ -355,14 +361,16 @@ public class Interpreter
             return IsTruthy(Evaluate(bin.Right));
         }
 
-        var l = Evaluate(bin.Left);
-        var r = Evaluate(bin.Right);
+        return ApplyBinaryOp(bin.Op, Evaluate(bin.Left), Evaluate(bin.Right));
+    }
 
+    private static object? ApplyBinaryOp(string op, object? l, object? r)
+    {
         // Numeric promotion: if either is double, promote both
-        if (l is int li && r is double rd) { l = (double)li; }
-        if (l is double ld && r is int ri) { r = (double)ri; }
+        if (l is int li && r is double) { l = (double)li; }
+        if (l is double && r is int ri) { r = (double)ri; }
 
-        return bin.Op switch
+        return op switch
         {
             "+" when l is int a && r is int b => a + b,
             "+" when l is double a && r is double b => a + b,
