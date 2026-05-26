@@ -1,6 +1,6 @@
-Point: (null, null)
-User: null, age null, active: null
-Modified point: (null, null)
-Modified user: null, active: null
-Original point still: (null, null)
+Point: (10, 20)
+User: Alice, age 30, active: true
+Modified point: (100, 20)
+Modified user: Bob, active: false
+Original point still: (10, 20)
 All record tests passed!

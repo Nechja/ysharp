@@ -1,8 +1,8 @@
 Let: x=42, name=Alice, flag=true, pi=3.14
 Mut counter: 2
 Compound: 39
-Member access: point.X + point.Y = null
-Nested: wrapper.Inner.X = null
+Member access: point.X + point.Y = 30
+Nested: wrapper.Inner.X = 10
 Hello, World!
 Bool: and=false, or=true, not=true
 All basic tests passed!

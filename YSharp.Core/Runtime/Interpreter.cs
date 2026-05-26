@@ -986,7 +986,9 @@ public class Interpreter
 public class RecordInstance(string typeName)
 {
     public string TypeName { get; } = typeName;
-    public Dictionary<string, object?> Fields { get; } = [];
+    // Case-insensitive so `point.x` and `point.X` both work — matches the
+    // PascalCase mapping the transpiler emits to C#.
+    public Dictionary<string, object?> Fields { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public override string ToString()
     {
@@ -1007,7 +1009,7 @@ public class EnumInstance(string enumName, string variantName)
 {
     public string EnumName { get; } = enumName;
     public string VariantName { get; } = variantName;
-    public Dictionary<string, object?> Fields { get; } = [];
+    public Dictionary<string, object?> Fields { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public override string ToString()
     {
@@ -1033,7 +1035,7 @@ public class CustomErrorInstance(string errorType, string variantName)
 {
     public string ErrorType { get; } = errorType;
     public string VariantName { get; } = variantName;
-    public Dictionary<string, object?> Fields { get; } = [];
+    public Dictionary<string, object?> Fields { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public override string ToString()
     {
