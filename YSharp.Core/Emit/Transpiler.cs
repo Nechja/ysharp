@@ -14,7 +14,9 @@ namespace YSharp.Core.Emit;
 /// </summary>
 public partial class Transpiler(string assemblyName)
 {
-    private readonly StringBuilder _sb = new();
+    private readonly StringBuilder _topSb = new();
+    private readonly StringBuilder _typeSb = new();
+    private StringBuilder _sb;
     private int _indent;
     private bool _usesResult;
     private bool _usesDi;
@@ -25,13 +27,16 @@ public partial class Transpiler(string assemblyName)
     private int _tryCounter;
     private int _concurrentTaskCounter;
     private readonly Dictionary<string, ModifierDecl> _modifiers = [];
+    private readonly Dictionary<string, ServiceDecl> _servicesByName = [];
 
     public bool UsesDependencyInjection => _usesDi;
     public bool UsesHttpRoutes => _usesRoutes;
 
     public string Transpile(List<Decl> declarations)
     {
-        _sb.Clear();
+        _topSb.Clear();
+        _typeSb.Clear();
+        _sb = _topSb;
         _indent = 0;
 
         var mainFn = declarations.OfType<FnDecl>().FirstOrDefault(f => f.Name == "main");
@@ -50,6 +55,10 @@ public partial class Transpiler(string assemblyName)
         foreach (var mod in modifiers)
             _modifiers[mod.Name] = mod;
 
+        _servicesByName.Clear();
+        foreach (var svc in services)
+            _servicesByName[svc.Name] = svc;
+
         CollectTypeNames(declarations);
         CollectAsyncFunctions(declarations);
         CollectVoidFunctions(declarations);
@@ -64,19 +73,42 @@ public partial class Transpiler(string assemblyName)
             AppendLine("");
         }
 
+        // When both routes and an app DI block are present, fold them into one
+        // WebApplication: the module registers into builder.Services, the app's
+        // main body runs once after Build(), and route handlers DI from app.Services.
+        var combineAppAndRoutes = _usesRoutes && appDecl is not null;
+
         if (_usesRoutes)
         {
             AppendLine("var builder = WebApplication.CreateBuilder(args);");
             AppendLine("builder.WebHost.UseUrls(\"http://localhost:9900\");");
+            if (combineAppAndRoutes)
+                AppendLine($"{appDecl!.ModuleName}Module.Configure(builder.Services);");
             AppendLine("var app = builder.Build();");
             AppendLine("");
         }
 
+        // === TOP-LEVEL STATEMENTS (_sb == _topSb) ===
         if (mainFn is not null)
             TranspileFunction(mainFn);
 
         foreach (var fn in otherFns)
             TranspileFunction(fn);
+
+        if (combineAppAndRoutes)
+            EmitAppStartup(appDecl!);
+
+        foreach (var route in routes)
+            TranspileRoute(route);
+
+        if (_usesRoutes)
+        {
+            AppendLine("app.Run();");
+            AppendLine("");
+        }
+
+        // === TYPE DECLARATIONS (collected into _typeSb) ===
+        _sb = _typeSb;
 
         foreach (var iface in interfaces)
             TranspileInterface(iface);
@@ -99,22 +131,16 @@ public partial class Transpiler(string assemblyName)
         foreach (var mod in modules)
             TranspileModule(mod);
 
-        foreach (var route in routes)
-            TranspileRoute(route);
-
-        if (_usesRoutes)
-        {
-            AppendLine("app.Run();");
-            AppendLine("");
-        }
-
-        if (appDecl is not null)
+        // Only emit the standalone Program.Main when routes are NOT in play
+        // (with routes, the app DI is wired into builder.Services above).
+        if (appDecl is not null && !_usesRoutes)
             TranspileApp(appDecl);
 
         if (_usesResult)
             EmitResultType();
 
-        return _sb.ToString();
+        // === FINAL ASSEMBLY: top-level first, then types ===
+        return _topSb.ToString() + _typeSb.ToString();
     }
 
     private void CollectTypeNames(List<Decl> declarations)

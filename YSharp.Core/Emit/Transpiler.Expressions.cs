@@ -82,6 +82,14 @@ public partial class Transpiler
 
     private void TranspileArray(ArrayExpr array)
     {
+        if (array.Elements.Count == 0)
+        {
+            // Empty literal — element type can't be inferred. Caller's typed slot
+            // (field, assignment) determines T, but we don't have that context here.
+            _sb.Append("new List<object>()");
+            return;
+        }
+
         _sb.Append("new[] { ");
         _sb.Append(string.Join(", ", array.Elements.Select(e =>
         {
@@ -91,7 +99,7 @@ public partial class Transpiler
             _sb.Length = start;
             return result;
         })));
-        _sb.Append(" }");
+        _sb.Append(" }.ToList()");
     }
 
     private void TranspileIndexAccess(IndexAccessExpr indexAccess)

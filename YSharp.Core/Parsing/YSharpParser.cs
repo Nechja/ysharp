@@ -797,15 +797,16 @@ public static class YSharpParser
     // INTERFACES
     // =========================================================================
 
-    /// <summary>Method signature: fn name(params) -> type;</summary>
+    /// <summary>Method signature: fn name(params) -> type [~modifier]*;</summary>
     private static TokenListParser<YSharpToken, MethodSig> MethodSignature { get; } =
         from fn in Token.EqualTo(YSharpToken.Fn)
         from name in Parse.Ref(() => FunctionName)
         from parms in Parameters
         from arrow in Token.EqualTo(YSharpToken.Arrow)
         from retType in TypeReference
+        from mods in Modifiers
         from semi in Token.EqualTo(YSharpToken.Semicolon)
-        select new MethodSig(name.ToStringValue(), parms, retType, fn.Span);
+        select new MethodSig(name.ToStringValue(), parms, retType, mods, fn.Span);
 
     /// <summary>Interface declaration: interface Name { method signatures }</summary>
     private static TokenListParser<YSharpToken, InterfaceDecl> Interface { get; } =

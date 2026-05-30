@@ -301,6 +301,7 @@ public record MethodSig(
     string Name,
     List<Param> Params,
     TypeRef ReturnType,
+    List<Modifier> Modifiers,
     TextSpan Span
 ) : AstNode(Span);
 

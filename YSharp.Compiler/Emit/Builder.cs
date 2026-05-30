@@ -32,7 +32,7 @@ public static class Builder
             <Project Sdk="{sdk}">
               <PropertyGroup>
                 <OutputType>Exe</OutputType>
-                <TargetFramework>net9.0</TargetFramework>
+                <TargetFramework>net10.0</TargetFramework>
                 <ImplicitUsings>enable</ImplicitUsings>
               </PropertyGroup>
               <ItemGroup>{diPackage}
@@ -46,7 +46,7 @@ public static class Builder
             RunDotnet(projectDir, "publish -c Release --nologo -v q");
 
             // Copy all published outputs
-            var publishDir = Path.Combine(projectDir, "bin", "Release", "net9.0", "publish");
+            var publishDir = Path.Combine(projectDir, "bin", "Release", "net10.0", "publish");
             foreach (var file in Directory.GetFiles(publishDir))
             {
                 var destPath = Path.Combine(outputDir, Path.GetFileName(file));
@@ -58,8 +58,8 @@ public static class Builder
             RunDotnet(projectDir, "build -c Release --nologo -v q");
 
             // Copy output
-            var builtDll = Path.Combine(projectDir, "bin", "Release", "net9.0", $"{assemblyName}.dll");
-            var builtConfig = Path.Combine(projectDir, "bin", "Release", "net9.0", $"{assemblyName}.runtimeconfig.json");
+            var builtDll = Path.Combine(projectDir, "bin", "Release", "net10.0", $"{assemblyName}.dll");
+            var builtConfig = Path.Combine(projectDir, "bin", "Release", "net10.0", $"{assemblyName}.runtimeconfig.json");
 
             File.Copy(builtDll, outputPath, overwrite: true);
             File.Copy(builtConfig, Path.ChangeExtension(outputPath, ".runtimeconfig.json"), overwrite: true);
@@ -92,7 +92,7 @@ public static class Builder
             <Project Sdk="{sdk}">
               <PropertyGroup>
                 <OutputType>Exe</OutputType>
-                <TargetFramework>net9.0</TargetFramework>
+                <TargetFramework>net10.0</TargetFramework>
                 <ImplicitUsings>enable</ImplicitUsings>
                 <PublishSingleFile>true</PublishSingleFile>
                 <SelfContained>true</SelfContained>
@@ -107,7 +107,7 @@ public static class Builder
 
         // Copy binary
         var binaryName = rid.StartsWith("win") ? $"{assemblyName}.exe" : assemblyName;
-        var publishedBinary = Path.Combine(projectDir, "bin", "Release", "net9.0", rid, "publish", binaryName);
+        var publishedBinary = Path.Combine(projectDir, "bin", "Release", "net10.0", rid, "publish", binaryName);
         var finalPath = Path.Combine(outputDir, binaryName);
 
         File.Copy(publishedBinary, finalPath, overwrite: true);

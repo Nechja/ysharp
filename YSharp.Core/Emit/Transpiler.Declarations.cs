@@ -136,7 +136,8 @@ public partial class Transpiler
 
         foreach (var method in iface.Methods)
         {
-            var returnType = GetReturnType(method.ReturnType);
+            var isBlocking = method.Modifiers.Any(m => m.Name == "blocking");
+            var returnType = isBlocking ? TranspileType(method.ReturnType) : GetReturnType(method.ReturnType);
             var parameters = string.Join(", ", method.Params.Select(p => $"{TranspileType(p.Type)} {p.Name}"));
             AppendLine($"{returnType} {Capitalize(method.Name)}({parameters});");
         }
@@ -296,7 +297,17 @@ public partial class Transpiler
             AppendLine($"{mod.Extends}Module.Configure(services);");
 
         foreach (var binding in mod.Bindings)
-            AppendLine($"services.AddScoped<{binding.Interface}, {binding.Implementation}>();");
+        {
+            var register = _servicesByName.TryGetValue(binding.Implementation, out var svc)
+                ? svc.Lifetime switch
+                {
+                    ServiceLifetime.Singleton => "AddSingleton",
+                    ServiceLifetime.Transient => "AddTransient",
+                    _ => "AddScoped"
+                }
+                : "AddScoped";
+            AppendLine($"services.{register}<{binding.Interface}, {binding.Implementation}>();");
+        }
 
         foreach (var provide in mod.Provides)
         {
@@ -363,6 +374,22 @@ public partial class Transpiler
 
         sb.Append(" return await next(context); })");
         return sb.ToString();
+    }
+
+    // Inline version used when the app is composed with routes: services are
+    // already on builder.Services, so we just resolve injected params from
+    // app.Services and run the main body as top-level statements.
+    private void EmitAppStartup(AppDecl app)
+    {
+        var mainFn = app.MainFn;
+        foreach (var param in mainFn.Params)
+            AppendLine($"var {param.Name} = app.Services.GetRequiredService<{TranspileType(param.Type)}>();");
+
+        if (mainFn.Body is not null)
+            foreach (var stmt in mainFn.Body.Statements)
+                TranspileStatement(stmt);
+
+        AppendLine("");
     }
 
     private void TranspileApp(AppDecl app)
