@@ -55,7 +55,7 @@ public partial class Transpiler
         }
 
         var isBlocking = IsBlocking(fn);
-        var parameters = string.Join(", ", fn.Params.Select(p => $"{TranspileType(p.Type)} {p.Name}"));
+        var parameters = string.Join(", ", fn.Params.Select(p => $"{TranspileType(p.Type)} {EscapeIdent(p.Name)}"));
         var typeParams = fn.TypeParams.Count > 0 ? $"<{string.Join(", ", fn.TypeParams)}>" : "";
 
         if (isBlocking)
@@ -91,7 +91,7 @@ public partial class Transpiler
     private void TranspileMethod(FnDecl method)
     {
         var isBlocking = IsBlocking(method);
-        var parameters = string.Join(", ", method.Params.Select(p => $"{TranspileType(p.Type)} {p.Name}"));
+        var parameters = string.Join(", ", method.Params.Select(p => $"{TranspileType(p.Type)} {EscapeIdent(p.Name)}"));
         var typeParams = method.TypeParams.Count > 0 ? $"<{string.Join(", ", method.TypeParams)}>" : "";
 
         if (isBlocking)
@@ -138,7 +138,7 @@ public partial class Transpiler
         {
             var isBlocking = method.Modifiers.Any(m => m.Name == "blocking");
             var returnType = isBlocking ? TranspileType(method.ReturnType) : GetReturnType(method.ReturnType);
-            var parameters = string.Join(", ", method.Params.Select(p => $"{TranspileType(p.Type)} {p.Name}"));
+            var parameters = string.Join(", ", method.Params.Select(p => $"{TranspileType(p.Type)} {EscapeIdent(p.Name)}"));
             AppendLine($"{returnType} {Capitalize(method.Name)}({parameters});");
         }
 
@@ -227,7 +227,7 @@ public partial class Transpiler
 
     private void TranspileClass(ClassDecl cls)
     {
-        var ctorParams = string.Join(", ", cls.ConstructorParams.Select(p => $"{TranspileType(p.Type)} {p.Name}"));
+        var ctorParams = string.Join(", ", cls.ConstructorParams.Select(p => $"{TranspileType(p.Type)} {EscapeIdent(p.Name)}"));
         var interfaces = cls.Interfaces.Count > 0 ? " : " + string.Join(", ", cls.Interfaces) : "";
 
         AppendLine(ctorParams.Length > 0 ? $"class {cls.Name}({ctorParams}){interfaces}" : $"class {cls.Name}{interfaces}");
@@ -262,7 +262,7 @@ public partial class Transpiler
 
     private void TranspileService(ServiceDecl svc)
     {
-        var ctorParams = string.Join(", ", svc.ConstructorParams.Select(p => $"{TranspileType(p.Type)} {p.Name}"));
+        var ctorParams = string.Join(", ", svc.ConstructorParams.Select(p => $"{TranspileType(p.Type)} {EscapeIdent(p.Name)}"));
         var iface = svc.Interface is not null ? $" : {svc.Interface}" : "";
 
         AppendLine(ctorParams.Length > 0 ? $"class {svc.Name}({ctorParams}){iface}" : $"class {svc.Name}{iface}");
@@ -376,6 +376,17 @@ public partial class Transpiler
         return sb.ToString();
     }
 
+    private void EmitLengthHelper()
+    {
+        AppendLine("static class __Y");
+        AppendLine("{");
+        AppendLine("    public static int Length(string s) => s.Length;");
+        AppendLine("    public static int Length<T>(System.Collections.Generic.IReadOnlyCollection<T> c) => c.Count;");
+        AppendLine("    public static int Length(System.Collections.IEnumerable e) { var n = 0; foreach (var _ in e) n++; return n; }");
+        AppendLine("}");
+        AppendLine("");
+    }
+
     // Inline version used when the app is composed with routes: services are
     // already on builder.Services, so we just resolve injected params from
     // app.Services and run the main body as top-level statements.
@@ -383,7 +394,7 @@ public partial class Transpiler
     {
         var mainFn = app.MainFn;
         foreach (var param in mainFn.Params)
-            AppendLine($"var {param.Name} = app.Services.GetRequiredService<{TranspileType(param.Type)}>();");
+            AppendLine($"var {EscapeIdent(param.Name)} = app.Services.GetRequiredService<{TranspileType(param.Type)}>();");
 
         if (mainFn.Body is not null)
             foreach (var stmt in mainFn.Body.Statements)

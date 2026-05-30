@@ -328,12 +328,21 @@ public static class YSharpParser
         from rparen in Token.EqualTo(YSharpToken.RParen)
         select expr;
 
-    /// <summary>Array literal: [1, 2, 3]</summary>
+    /// <summary>Array literal: [1, 2, 3] — trailing comma allowed.</summary>
     private static TokenListParser<YSharpToken, Expr> ArrayLiteral { get; } =
         from lbracket in Token.EqualTo(YSharpToken.LBracket)
-        from elements in Parse.Ref(() => Expression).ManyDelimitedBy(Token.EqualTo(YSharpToken.Comma))
+        from elements in (
+            from first in Parse.Ref(() => Expression)
+            from rest in (
+                from comma in Token.EqualTo(YSharpToken.Comma)
+                from elem in Parse.Ref(() => Expression)
+                select elem
+            ).Try().Many()
+            from trailing in Token.EqualTo(YSharpToken.Comma).Optional()
+            select new[] { first }.Concat(rest).ToList()
+        ).OptionalOrDefault(new List<Expr>())
         from rbracket in Token.EqualTo(YSharpToken.RBracket)
-        select (Expr)new ArrayExpr(elements.ToList(), lbracket.Span);
+        select (Expr)new ArrayExpr(elements, lbracket.Span);
 
     /// <summary>
     /// Blocking expression: blocking { statements }

@@ -86,6 +86,24 @@ public partial class Transpiler
          .Replace("\n", "\\n")
          .Replace("\r", "\\r");
 
+    // C# reserved words that a Y# user might legitimately use as an identifier
+    // (Y# keywords like `class`/`if`/`fn` are excluded — they can never reach here).
+    private static readonly HashSet<string> CSharpReservedWords =
+    [
+        "abstract", "as", "base", "byte", "case", "catch", "checked", "const",
+        "decimal", "default", "delegate", "do", "else", "event", "explicit",
+        "extern", "false", "finally", "fixed", "foreach", "goto", "implicit",
+        "in", "internal", "is", "lock", "namespace", "new", "null", "object",
+        "operator", "out", "override", "params", "private", "protected",
+        "public", "readonly", "ref", "sbyte", "sealed", "short", "sizeof",
+        "stackalloc", "static", "switch", "this", "throw", "true", "try",
+        "typeof", "uint", "ulong", "unchecked", "unsafe", "ushort", "using",
+        "virtual", "volatile", "while"
+    ];
+
+    private static string EscapeIdent(string name) =>
+        CSharpReservedWords.Contains(name) ? "@" + name : name;
+
     private string TranspileExpressionToString(Expr expr)
     {
         var startPos = _sb.Length;

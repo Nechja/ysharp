@@ -13,7 +13,7 @@ public partial class Transpiler
         BoolLiteralExpr b => () => _sb.Append(b.Value ? "true" : "false"),
         NoneExpr => () => _sb.Append("null"),
         SomeExpr some => () => TranspileExpression(some.Value),
-        IdentifierExpr id => () => _sb.Append(id.Name),
+        IdentifierExpr id => () => _sb.Append(EscapeIdent(id.Name)),
         BinaryExpr bin => () => TranspileBinary(bin),
         UnaryExpr unary => () => TranspileUnary(unary),
         TryExpr tryExpr => () => TranspileTryExpr(tryExpr),
@@ -65,6 +65,17 @@ public partial class Transpiler
 
     private void TranspileMemberAccess(MemberAccessExpr member)
     {
+        // `.length` is the polymorphic Y# length accessor; route through a tiny
+        // runtime helper so it works on both strings and any collection.
+        if (member.Member == "length")
+        {
+            _usesLength = true;
+            _sb.Append("__Y.Length(");
+            TranspileExpression(member.Target);
+            _sb.Append(")");
+            return;
+        }
+
         TranspileExpression(member.Target);
         _sb.Append($".{Capitalize(member.Member)}");
     }

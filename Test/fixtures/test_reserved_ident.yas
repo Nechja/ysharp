@@ -1,0 +1,7 @@
+// Y# identifiers that clash with C# reserved words should still work.
+fn main() -> void {
+    let out = "first";
+    let ref = "second";
+    let base = "third";
+    print($"{out} {ref} {base}");
+}

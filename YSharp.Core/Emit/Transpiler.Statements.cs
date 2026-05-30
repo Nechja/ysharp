@@ -89,7 +89,7 @@ public partial class Transpiler
 
         Append("");
         _sb.Append(varDecl.Type is not null ? $"{TranspileType(varDecl.Type)} " : "var ");
-        _sb.Append($"{varDecl.Name} = ");
+        _sb.Append($"{EscapeIdent(varDecl.Name)} = ");
         TranspileExpression(varDecl.Value);
         _sb.AppendLine(";");
     }
@@ -106,15 +106,15 @@ public partial class Transpiler
             }),
             (_, RangeExpr range) => () =>
             {
-                Append($"for (var {forStmt.Variable} = ");
+                Append($"for (var {EscapeIdent(forStmt.Variable)} = ");
                 TranspileExpression(range.Start);
-                _sb.Append($"; {forStmt.Variable} < ");
+                _sb.Append($"; {EscapeIdent(forStmt.Variable)} < ");
                 TranspileExpression(range.End);
-                _sb.AppendLine($"; {forStmt.Variable}++)");
+                _sb.AppendLine($"; {EscapeIdent(forStmt.Variable)}++)");
             },
             _ => () =>
             {
-                Append($"foreach (var {forStmt.Variable} in ");
+                Append($"foreach (var {EscapeIdent(forStmt.Variable)} in ");
                 TranspileExpression(forStmt.Iterable);
                 _sb.AppendLine(")");
             }
@@ -130,14 +130,14 @@ public partial class Transpiler
 
     private void TranspileAssign(AssignStmt assign)
     {
-        Append($"{assign.Target} = ");
+        Append($"{EscapeIdent(assign.Target)} = ");
         TranspileExpression(assign.Value);
         _sb.AppendLine(";");
     }
 
     private void TranspileCompoundAssign(CompoundAssignStmt compound)
     {
-        Append($"{compound.Target} {compound.Op}= ");
+        Append($"{EscapeIdent(compound.Target)} {compound.Op}= ");
         TranspileExpression(compound.Value);
         _sb.AppendLine(";");
     }
@@ -153,7 +153,7 @@ public partial class Transpiler
         AppendLine($"if ({tempVar}.IsError) return {tempVar}.Error.Value;");
 
         var typePrefix = varDecl.Type is not null ? $"{TranspileType(varDecl.Type)} " : "var ";
-        AppendLine($"{typePrefix}{varDecl.Name} = {tempVar}.Value;");
+        AppendLine($"{typePrefix}{EscapeIdent(varDecl.Name)} = {tempVar}.Value;");
     }
 
     private void TranspileTryStmt(TryExpr tryExpr)

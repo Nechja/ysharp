@@ -21,6 +21,7 @@ public partial class Transpiler(string assemblyName)
     private bool _usesResult;
     private bool _usesDi;
     private bool _usesRoutes;
+    private bool _usesLength;
     private readonly HashSet<string> _typeNames = [];
     private readonly HashSet<string> _asyncFunctions = [];
     private readonly HashSet<string> _voidFunctions = [];
@@ -38,6 +39,7 @@ public partial class Transpiler(string assemblyName)
         _typeSb.Clear();
         _sb = _topSb;
         _indent = 0;
+        _usesLength = false;
 
         var mainFn = declarations.OfType<FnDecl>().FirstOrDefault(f => f.Name == "main");
         var otherFns = declarations.OfType<FnDecl>().Where(f => f.Name != "main");
@@ -138,6 +140,9 @@ public partial class Transpiler(string assemblyName)
 
         if (_usesResult)
             EmitResultType();
+
+        if (_usesLength)
+            EmitLengthHelper();
 
         // === FINAL ASSEMBLY: top-level first, then types ===
         return _topSb.ToString() + _typeSb.ToString();
