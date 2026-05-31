@@ -50,7 +50,7 @@ Console.WriteLine($"Compiling: {inputFile}");
 var tokenResult = YSharpTokenizer.Instance.TryTokenize(source);
 if (!tokenResult.HasValue)
 {
-    Console.WriteLine($"Tokenization failed at {tokenResult.ErrorPosition}");
+    PrintDiagnostic("tokenize", inputFile, source, tokenResult.ErrorPosition.Line, tokenResult.ErrorPosition.Column, tokenResult.ErrorMessage);
     return 1;
 }
 
@@ -58,8 +58,10 @@ if (!tokenResult.HasValue)
 var parseResult = YSharpParser.Program.TryParse(tokenResult.Value);
 if (!parseResult.HasValue)
 {
-    Console.WriteLine($"Parse failed: {parseResult.ErrorMessage}");
-    Console.WriteLine($"At: {parseResult.ErrorPosition}");
+    var msg = parseResult.ErrorMessage;
+    if (string.IsNullOrWhiteSpace(msg) && parseResult.Expectations is { } exp && exp.Any())
+        msg = SummarizeExpectations(exp.Distinct().ToArray());
+    PrintDiagnostic("parse", inputFile, source, parseResult.ErrorPosition.Line, parseResult.ErrorPosition.Column, msg);
     return 1;
 }
 
@@ -116,3 +118,46 @@ catch (Exception ex)
 }
 
 return 0;
+
+// Token-name hints from the parser's failure-set are individually meaningless and
+// collectively enormous. Detect the common "start of expression" set and just say so.
+static string SummarizeExpectations(string[] exp)
+{
+    var set = exp.Select(e => e.ToLowerInvariant()).ToHashSet();
+    var expressionStarters = new[] { "integer", "decimal", "string", "identifier", "true", "false", "none", "lbracket" };
+    if (expressionStarters.Count(set.Contains) >= 3)
+        return "expected expression";
+
+    if (exp.Length <= 4)
+        return "expected " + string.Join(" or ", exp);
+
+    return "expected " + string.Join(", ", exp.Take(3)) + $", or {exp.Length - 3} other tokens";
+}
+
+static void PrintDiagnostic(string kind, string file, string source, int line, int column, string? message)
+{
+    var lines = source.Split('\n');
+    var lineIdx = line - 1;
+    var bad = lineIdx >= 0 && lineIdx < lines.Length ? lines[lineIdx].TrimEnd('\r') : "";
+
+    // Tabs throw off the caret; replace with two spaces and track the resulting column.
+    var displayLine = bad.Replace("\t", "  ");
+    var displayCol = 0;
+    for (int i = 0; i < column - 1 && i < bad.Length; i++)
+        displayCol += bad[i] == '\t' ? 2 : 1;
+
+    var gutter = line.ToString();
+    var pad = new string(' ', gutter.Length);
+
+    Console.ForegroundColor = ConsoleColor.Red;
+    Console.Write($"error[{kind}]: ");
+    Console.ResetColor();
+    Console.WriteLine(string.IsNullOrWhiteSpace(message) ? "compilation failed" : message);
+    Console.WriteLine($"  {pad}--> {file}:{line}:{column}");
+    Console.WriteLine($"  {pad} |");
+    Console.WriteLine($"  {gutter} | {displayLine}");
+    Console.Write($"  {pad} | {new string(' ', displayCol)}");
+    Console.ForegroundColor = ConsoleColor.Red;
+    Console.WriteLine("^");
+    Console.ResetColor();
+}
