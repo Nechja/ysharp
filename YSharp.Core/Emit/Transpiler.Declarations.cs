@@ -376,6 +376,18 @@ public partial class Transpiler
         return sb.ToString();
     }
 
+    private void EmitJsonContext(List<RecordDecl> records)
+    {
+        AppendLine("[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]");
+        foreach (var rec in records)
+        {
+            AppendLine($"[JsonSerializable(typeof({rec.Name}))]");
+            AppendLine($"[JsonSerializable(typeof(System.Collections.Generic.List<{rec.Name}>))]");
+        }
+        AppendLine("internal partial class AppJsonContext : JsonSerializerContext { }");
+        AppendLine("");
+    }
+
     private void EmitLengthHelper()
     {
         AppendLine("static class __Y");

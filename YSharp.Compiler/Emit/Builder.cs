@@ -94,15 +94,17 @@ public static class Builder
                 <OutputType>Exe</OutputType>
                 <TargetFramework>net10.0</TargetFramework>
                 <ImplicitUsings>enable</ImplicitUsings>
-                <PublishSingleFile>true</PublishSingleFile>
-                <SelfContained>true</SelfContained>
+                <PublishAot>true</PublishAot>
+                <InvariantGlobalization>true</InvariantGlobalization>
+                <StripSymbols>true</StripSymbols>
               </PropertyGroup>
               <ItemGroup>{diPackage}
               </ItemGroup>
             </Project>
             """);
 
-        // Publish
+        // Publish — AOT runs ILC so this is noticeably slower than a JIT build,
+        // but produces a small native binary with no .NET runtime dependency.
         RunDotnet(projectDir, $"publish -c Release -r {rid} --nologo -v q");
 
         // Copy binary

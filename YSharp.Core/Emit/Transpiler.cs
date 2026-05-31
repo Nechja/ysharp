@@ -82,8 +82,14 @@ public partial class Transpiler(string assemblyName)
 
         if (_usesRoutes)
         {
-            AppendLine("var builder = WebApplication.CreateBuilder(args);");
+            AppendLine("using System.Text.Json.Serialization;");
+            AppendLine("");
+            // CreateSlimBuilder is the AOT-friendly minimal-host entry point.
+            AppendLine("var builder = WebApplication.CreateSlimBuilder(args);");
             AppendLine("builder.WebHost.UseUrls(\"http://localhost:9900\");");
+            // Wire the source-gen'd JSON context so System.Text.Json never reflects.
+            AppendLine("builder.Services.ConfigureHttpJsonOptions(o =>");
+            AppendLine("    o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));");
             if (combineAppAndRoutes)
                 AppendLine($"{appDecl!.ModuleName}Module.Configure(builder.Services);");
             AppendLine("var app = builder.Build();");
@@ -143,6 +149,9 @@ public partial class Transpiler(string assemblyName)
 
         if (_usesLength)
             EmitLengthHelper();
+
+        if (_usesRoutes)
+            EmitJsonContext(records.ToList());
 
         // === FINAL ASSEMBLY: top-level first, then types ===
         return _topSb.ToString() + _typeSb.ToString();
