@@ -9,6 +9,9 @@ publish/
 # Compiled Y# output (from running ysc against samples/)
 samples/**/*.deps.json
 samples/**/*.runtimeconfig.json
+Test/fixtures/**/*.dll
+Test/fixtures/**/*.runtimeconfig.json
+Test/fixtures/**/*.deps.json
 samples/**/*.staticwebassets.endpoints.json
 # Native binaries from `ysc --bin` land next to their .yas source
 samples/*

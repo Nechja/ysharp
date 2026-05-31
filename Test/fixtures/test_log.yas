@@ -1,0 +1,8 @@
+// Built-in `log` value. Methods: info, warn, error, debug.
+// Compiled output is structured JSON lines. Interpreted output is "info: ..." style.
+
+fn main() -> void {
+    log.info("started");
+    log.warn("disk getting full");
+    log.error("operation failed");
+}

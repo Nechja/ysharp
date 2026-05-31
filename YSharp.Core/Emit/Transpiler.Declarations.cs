@@ -415,6 +415,20 @@ public partial class Transpiler
         AppendLine("");
     }
 
+    private void EmitLogHelper()
+    {
+        AppendLine("static partial class __Y");
+        AppendLine("{");
+        AppendLine("    public static void Log(string level, string message)");
+        AppendLine("    {");
+        AppendLine("        var ts = System.DateTime.UtcNow.ToString(\"o\");");
+        AppendLine("        var json = System.Text.Json.JsonSerializer.Serialize(message);");
+        AppendLine("        System.Console.WriteLine($\"{{\\\"level\\\":\\\"{level}\\\",\\\"ts\\\":\\\"{ts}\\\",\\\"msg\\\":{json}}}\");");
+        AppendLine("    }");
+        AppendLine("}");
+        AppendLine("");
+    }
+
     private void EmitResultHttpHelper()
     {
         AppendLine("static partial class __Y");

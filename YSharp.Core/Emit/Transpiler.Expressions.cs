@@ -237,6 +237,16 @@ public partial class Transpiler
             return;
         }
 
+        // `env(name)` reads an environment variable. Returns string? — pair with
+        // the `?? "default"` operator-style fallback that C# already understands.
+        if (id.Name == "env")
+        {
+            _sb.Append("System.Environment.GetEnvironmentVariable(");
+            TranspileArgs(call.Args);
+            _sb.Append(")");
+            return;
+        }
+
         if (_typeNames.Contains(id.Name))
         {
             _sb.Append($"new {id.Name}{typeArgs}(");
@@ -255,6 +265,18 @@ public partial class Transpiler
 
     private void TranspileMemberCall(MemberAccessExpr member, CallExpr call)
     {
+        // Built-in `log.info(...)` / `log.warn(...)` / `log.error(...)` / `log.debug(...)`.
+        // Emits a JSON-lines record via a tiny runtime helper — AOT-safe, no deps.
+        if (member.Target is IdentifierExpr logId && logId.Name == "log" &&
+            member.Member is "info" or "warn" or "error" or "debug")
+        {
+            _usesLog = true;
+            _sb.Append($"__Y.Log(\"{member.Member}\", ");
+            TranspileArgs(call.Args);
+            _sb.Append(")");
+            return;
+        }
+
         if (member.Target is IdentifierExpr enumName)
         {
             var fullName = $"{enumName.Name}.{member.Member}";

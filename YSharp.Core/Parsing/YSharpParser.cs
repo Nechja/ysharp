@@ -444,9 +444,9 @@ public static class YSharpParser
              from rbracket in Token.EqualTo(YSharpToken.RBracket)
              select (Func<Expr, Expr>)(e => new IndexAccessExpr(e, index, EmptySpan)))
             .Or(
-            // Member access: .member
+            // Member access: .member — allow keywords-as-names (e.g., `log.error`, `obj.get`).
              from dot in Token.EqualTo(YSharpToken.Dot)
-             from member in Token.EqualTo(YSharpToken.Identifier)
+             from member in MemberName
              select (Func<Expr, Expr>)(e => new MemberAccessExpr(e, member.ToStringValue(), EmptySpan)))
             .Or(
             // Try/propagate: expr?
@@ -1115,6 +1115,13 @@ public static class YSharpParser
             .Or(Token.EqualTo(YSharpToken.Post))
             .Or(Token.EqualTo(YSharpToken.Put))
             .Or(Token.EqualTo(YSharpToken.Delete));
+
+    /// <summary>
+    /// Same set as FunctionName plus `error` — used after a `.` in member access
+    /// so `log.error(...)`, `result.get(...)` etc work without renaming methods.
+    /// </summary>
+    private static TokenListParser<YSharpToken, Token<YSharpToken>> MemberName { get; } =
+        FunctionName.Or(Token.EqualTo(YSharpToken.ErrorType));
 
     /// <summary>
     /// Function with block body: fn name&lt;T&gt;(params) -> type ~modifiers { body }

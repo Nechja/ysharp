@@ -23,6 +23,7 @@ public partial class Transpiler(string assemblyName)
     private bool _usesRoutes;
     private bool _usesLength;
     private bool _usesResultHttp;
+    private bool _usesLog;
     private readonly HashSet<string> _typeNames = [];
     private readonly HashSet<string> _asyncFunctions = [];
     private readonly HashSet<string> _voidFunctions = [];
@@ -43,6 +44,7 @@ public partial class Transpiler(string assemblyName)
         _indent = 0;
         _usesLength = false;
         _usesResultHttp = false;
+        _usesLog = false;
 
         var mainFn = declarations.OfType<FnDecl>().FirstOrDefault(f => f.Name == "main");
         var otherFns = declarations.OfType<FnDecl>().Where(f => f.Name != "main");
@@ -103,7 +105,9 @@ public partial class Transpiler(string assemblyName)
         {
             // CreateSlimBuilder is the AOT-friendly minimal-host entry point.
             AppendLine("var builder = WebApplication.CreateSlimBuilder(args);");
-            AppendLine("builder.WebHost.UseUrls(\"http://localhost:9900\");");
+            // Honor $PORT (cloud / container convention); fall back to 9900 for dev.
+            AppendLine("var __port = System.Environment.GetEnvironmentVariable(\"PORT\") ?? \"9900\";");
+            AppendLine("builder.WebHost.UseUrls($\"http://0.0.0.0:{__port}\");");
             // Wire the source-gen'd JSON context so System.Text.Json never reflects.
             AppendLine("builder.Services.ConfigureHttpJsonOptions(o =>");
             AppendLine("    o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));");
@@ -169,6 +173,9 @@ public partial class Transpiler(string assemblyName)
 
         if (_usesResultHttp)
             EmitResultHttpHelper();
+
+        if (_usesLog)
+            EmitLogHelper();
 
         if (_usesRoutes)
         {
