@@ -22,6 +22,7 @@ public partial class Transpiler(string assemblyName)
     private bool _usesDi;
     private bool _usesRoutes;
     private bool _usesLength;
+    private bool _usesResultHttp;
     private readonly HashSet<string> _typeNames = [];
     private readonly HashSet<string> _asyncFunctions = [];
     private readonly HashSet<string> _voidFunctions = [];
@@ -29,6 +30,7 @@ public partial class Transpiler(string assemblyName)
     private int _concurrentTaskCounter;
     private readonly Dictionary<string, ModifierDecl> _modifiers = [];
     private readonly Dictionary<string, ServiceDecl> _servicesByName = [];
+    private readonly Dictionary<string, FnDecl> _fnsByName = [];
 
     public bool UsesDependencyInjection => _usesDi;
     public bool UsesHttpRoutes => _usesRoutes;
@@ -40,6 +42,7 @@ public partial class Transpiler(string assemblyName)
         _sb = _topSb;
         _indent = 0;
         _usesLength = false;
+        _usesResultHttp = false;
 
         var mainFn = declarations.OfType<FnDecl>().FirstOrDefault(f => f.Name == "main");
         var otherFns = declarations.OfType<FnDecl>().Where(f => f.Name != "main");
@@ -61,6 +64,10 @@ public partial class Transpiler(string assemblyName)
         foreach (var svc in services)
             _servicesByName[svc.Name] = svc;
 
+        _fnsByName.Clear();
+        foreach (var fn in declarations.OfType<FnDecl>())
+            _fnsByName[fn.Name] = fn;
+
         CollectTypeNames(declarations);
         CollectAsyncFunctions(declarations);
         CollectVoidFunctions(declarations);
@@ -75,6 +82,18 @@ public partial class Transpiler(string assemblyName)
             AppendLine("");
         }
 
+        // JSON attributes show up on tagged unions (JsonPolymorphic), `~secret`
+        // fields (JsonIgnore), and the route-side AppJsonContext.
+        var needsJsonAttrs = _usesRoutes
+            || enums.Any()
+            || errors.Any()
+            || records.Any(r => r.Fields.Any(f => f.Modifiers.Any(m => m.Name == "secret")));
+        if (needsJsonAttrs)
+        {
+            AppendLine("using System.Text.Json.Serialization;");
+            AppendLine("");
+        }
+
         // When both routes and an app DI block are present, fold them into one
         // WebApplication: the module registers into builder.Services, the app's
         // main body runs once after Build(), and route handlers DI from app.Services.
@@ -82,8 +101,6 @@ public partial class Transpiler(string assemblyName)
 
         if (_usesRoutes)
         {
-            AppendLine("using System.Text.Json.Serialization;");
-            AppendLine("");
             // CreateSlimBuilder is the AOT-friendly minimal-host entry point.
             AppendLine("var builder = WebApplication.CreateSlimBuilder(args);");
             AppendLine("builder.WebHost.UseUrls(\"http://localhost:9900\");");
@@ -150,8 +167,11 @@ public partial class Transpiler(string assemblyName)
         if (_usesLength)
             EmitLengthHelper();
 
+        if (_usesResultHttp)
+            EmitResultHttpHelper();
+
         if (_usesRoutes)
-            EmitJsonContext(records.ToList());
+            EmitJsonContext(records.ToList(), enums.ToList(), errors.ToList());
 
         // === FINAL ASSEMBLY: top-level first, then types ===
         return _topSb.ToString() + _typeSb.ToString();

@@ -257,6 +257,7 @@ public record RecordField(
     string Name,
     TypeRef Type,
     Expr? DefaultValue,
+    List<Modifier> Modifiers,
     TextSpan Span
 ) : AstNode(Span);
 

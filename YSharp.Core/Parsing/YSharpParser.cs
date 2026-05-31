@@ -733,7 +733,7 @@ public static class YSharpParser
     // RECORDS
     // =========================================================================
 
-    /// <summary>Record field: name: type or name: type = default;</summary>
+    /// <summary>Record field: name: type [= default] [~modifier]*;</summary>
     private static TokenListParser<YSharpToken, RecordField> RecordField { get; } =
         from name in Token.EqualTo(YSharpToken.Identifier)
         from colon in Token.EqualTo(YSharpToken.Colon)
@@ -743,8 +743,9 @@ public static class YSharpParser
             from value in Expression
             select value
         ).OptionalOrDefault()
+        from mods in Modifiers
         from semi in Token.EqualTo(YSharpToken.Semicolon)
-        select new RecordField(name.ToStringValue(), type, defaultValue, name.Span);
+        select new RecordField(name.ToStringValue(), type, defaultValue, mods, name.Span);
 
     /// <summary>Record declaration: record Name { fields }</summary>
     private static TokenListParser<YSharpToken, RecordDecl> Record { get; } =

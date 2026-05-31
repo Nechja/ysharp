@@ -147,34 +147,30 @@ public partial class Transpiler
         AppendLine("");
     }
 
-    private void TranspileEnum(EnumDecl enm)
+    private void TranspileEnum(EnumDecl enm) =>
+        TranspileTaggedUnion(enm.Name, enm.Variants);
+
+    private void TranspileError(ErrorDecl err) =>
+        TranspileTaggedUnion(err.Name, err.Variants);
+
+    // Shared shape for `enum` and `error` declarations: an abstract record with
+    // sealed-record variants, tagged with JSON polymorphism so they round-trip
+    // as `{"kind":"VariantName", ...fields}` through System.Text.Json.
+    private void TranspileTaggedUnion(string name, List<EnumVariant> variants)
     {
-        AppendLine($"abstract record {enm.Name}");
+        AppendLine("[JsonPolymorphic(TypeDiscriminatorPropertyName = \"kind\")]");
+        foreach (var v in variants)
+            AppendLine($"[JsonDerivedType(typeof({name}.{v.Name}), \"{v.Name}\")]");
+
+        AppendLine($"abstract record {name}");
         AppendLine("{");
         _indent++;
 
-        AppendLine($"private {enm.Name}() {{ }}");
+        AppendLine($"private {name}() {{ }}");
         AppendLine("");
 
-        foreach (var variant in enm.Variants)
-            TranspileEnumVariant(enm.Name, variant);
-
-        _indent--;
-        AppendLine("}");
-        AppendLine("");
-    }
-
-    private void TranspileError(ErrorDecl err)
-    {
-        AppendLine($"abstract record {err.Name}");
-        AppendLine("{");
-        _indent++;
-
-        AppendLine($"private {err.Name}() {{ }}");
-        AppendLine("");
-
-        foreach (var variant in err.Variants)
-            TranspileEnumVariant(err.Name, variant);
+        foreach (var variant in variants)
+            TranspileEnumVariant(name, variant);
 
         _indent--;
         AppendLine("}");
@@ -199,7 +195,13 @@ public partial class Transpiler
         var fieldsWithoutDefaults = rec.Fields.Where(f => f.DefaultValue is null).ToList();
         var fieldsWithDefaults = rec.Fields.Where(f => f.DefaultValue is not null).ToList();
 
-        var primaryParams = string.Join(", ", fieldsWithoutDefaults.Select(f => $"{TranspileType(f.Type)} {Capitalize(f.Name)}"));
+        // `~secret` lifts to [property: JsonIgnore] on positional record params
+        // so the field exists in the type but never appears in serialized JSON.
+        var primaryParams = string.Join(", ", fieldsWithoutDefaults.Select(f =>
+        {
+            var attrs = IsSecret(f) ? "[property: JsonIgnore] " : "";
+            return $"{attrs}{TranspileType(f.Type)} {Capitalize(f.Name)}";
+        }));
 
         if (fieldsWithDefaults.Count == 0)
         {
@@ -213,6 +215,7 @@ public partial class Transpiler
 
             foreach (var field in fieldsWithDefaults)
             {
+                if (IsSecret(field)) AppendLine("[JsonIgnore]");
                 Append($"public {TranspileType(field.Type)} {Capitalize(field.Name)} {{ get; init; }} = ");
                 TranspileExpression(field.DefaultValue!);
                 _sb.AppendLine(";");
@@ -224,6 +227,8 @@ public partial class Transpiler
 
         AppendLine("");
     }
+
+    private static bool IsSecret(RecordField f) => f.Modifiers.Any(m => m.Name == "secret");
 
     private void TranspileClass(ClassDecl cls)
     {
@@ -343,7 +348,8 @@ public partial class Transpiler
             fullPath = fullPath.Replace("//", "/");
 
             var routeBuilder = new StringBuilder();
-            routeBuilder.Append($"app.{method}(\"{fullPath}\", {Capitalize(endpoint.Handler)})");
+            var handlerExpr = BuildHandlerExpression(endpoint.Handler);
+            routeBuilder.Append($"app.{method}(\"{fullPath}\", {handlerExpr})");
 
             foreach (var mod in endpoint.Modifiers)
             {
@@ -356,6 +362,22 @@ public partial class Transpiler
         }
         AppendLine("");
     }
+
+    // If the handler returns Result<T>, wrap it in a lambda that maps to HTTP
+    // status codes via __Y.Wrap. Otherwise hand the method group to MapGet as-is.
+    private string BuildHandlerExpression(string handlerName)
+    {
+        if (!_fnsByName.TryGetValue(handlerName, out var fn) || !IsResultReturn(fn.ReturnType))
+            return Capitalize(handlerName);
+
+        _usesResultHttp = true;
+        var paramList = string.Join(", ", fn.Params.Select(p => $"{TranspileType(p.Type)} {EscapeIdent(p.Name)}"));
+        var argList = string.Join(", ", fn.Params.Select(p => EscapeIdent(p.Name)));
+        return $"({paramList}) => __Y.Wrap({Capitalize(handlerName)}({argList}))";
+    }
+
+    private static bool IsResultReturn(TypeRef t) =>
+        t is GenericTypeRef { Name: "Result" };
 
     private string GenerateEndpointFilter(ModifierDecl modDecl, List<Expr>? args)
     {
@@ -376,7 +398,7 @@ public partial class Transpiler
         return sb.ToString();
     }
 
-    private void EmitJsonContext(List<RecordDecl> records)
+    private void EmitJsonContext(List<RecordDecl> records, List<EnumDecl> enums, List<ErrorDecl> errors)
     {
         AppendLine("[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]");
         foreach (var rec in records)
@@ -384,13 +406,35 @@ public partial class Transpiler
             AppendLine($"[JsonSerializable(typeof({rec.Name}))]");
             AppendLine($"[JsonSerializable(typeof(System.Collections.Generic.List<{rec.Name}>))]");
         }
+        // Enums/errors are abstract base records; STJ picks up variants via JsonDerivedType.
+        foreach (var enm in enums)
+            AppendLine($"[JsonSerializable(typeof({enm.Name}))]");
+        foreach (var err in errors)
+            AppendLine($"[JsonSerializable(typeof({err.Name}))]");
         AppendLine("internal partial class AppJsonContext : JsonSerializerContext { }");
+        AppendLine("");
+    }
+
+    private void EmitResultHttpHelper()
+    {
+        AppendLine("static partial class __Y");
+        AppendLine("{");
+        AppendLine("    public static Microsoft.AspNetCore.Http.IResult Wrap<T>(Result<T> r) =>");
+        AppendLine("        r.IsOk");
+        AppendLine("            ? Microsoft.AspNetCore.Http.Results.Ok(r.Value)");
+        AppendLine("            : r.Error!.Value.Kind switch");
+        AppendLine("              {");
+        AppendLine("                  ErrorKind.NotFound   => Microsoft.AspNetCore.Http.Results.NotFound(new { error = r.Error.Value.Code, message = r.Error.Value.Description }),");
+        AppendLine("                  ErrorKind.Validation => Microsoft.AspNetCore.Http.Results.BadRequest(new { error = r.Error.Value.Code, message = r.Error.Value.Description }),");
+        AppendLine("                  _                    => Microsoft.AspNetCore.Http.Results.Problem(r.Error.Value.Description, statusCode: 500),");
+        AppendLine("              };");
+        AppendLine("}");
         AppendLine("");
     }
 
     private void EmitLengthHelper()
     {
-        AppendLine("static class __Y");
+        AppendLine("static partial class __Y");
         AppendLine("{");
         AppendLine("    public static int Length(string s) => s.Length;");
         AppendLine("    public static int Length<T>(System.Collections.Generic.IReadOnlyCollection<T> c) => c.Count;");
