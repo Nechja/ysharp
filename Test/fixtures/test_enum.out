@@ -1,4 +1,4 @@
 plain: Status.Active
-created: OrderStatus.Created
-shipped: OrderStatus.Shipped(tracking: 1Z999)
-delivered: OrderStatus.Delivered(receipt: 42)
+waiting
+out for delivery, tracking=1Z999
+delivered, receipt=42

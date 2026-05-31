@@ -13,6 +13,13 @@ using YSharp.Core.Parsing;
 var showHelp = args.Contains("--help") || args.Contains("-h");
 var buildBinary = args.Contains("--bin");
 var emitCSharp = args.Contains("--emit-cs");
+
+// Subcommands
+if (args.Length > 0 && args[0] == "init")
+    return Init(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "watch")
+    return Watch(args.Skip(1).ToArray());
+
 var inputFile = args.FirstOrDefault(a => !a.StartsWith("-")) ?? "hello.yas";
 
 if (showHelp)
@@ -20,15 +27,21 @@ if (showHelp)
     Console.WriteLine("""
         Y# Compiler
 
-        Usage: ysc <file.yas> [options]
+        Usage:
+          ysc <file.yas> [options]    compile a Y# program
+          ysc init [name]             scaffold a new Y# project
+          ysc watch <file.yas>        rebuild + restart on save
 
         Options:
-          --bin    Build as self-contained native binary
-          --help   Show this help
+          --bin       build as self-contained AOT native binary
+          --emit-cs   print the generated C# instead of building
+          --help      show this help
 
         Examples:
           ysc hello.yas          # Creates hello.dll (run with: dotnet hello.dll)
           ysc hello.yas --bin    # Creates hello binary (run with: ./hello)
+          ysc init why-api       # Scaffold a new API project
+          ysc watch api.yas      # Live-reload during development
         """);
     return 0;
 }
@@ -132,6 +145,140 @@ static string SummarizeExpectations(string[] exp)
         return "expected " + string.Join(" or ", exp);
 
     return "expected " + string.Join(", ", exp.Take(3)) + $", or {exp.Length - 3} other tokens";
+}
+
+static int Init(string[] args)
+{
+    var name = args.FirstOrDefault(a => !a.StartsWith("-")) ?? ".";
+    var dir = name == "." ? "." : name;
+
+    if (dir != "." && Directory.Exists(dir))
+    {
+        Console.WriteLine($"Error: directory '{dir}' already exists");
+        return 1;
+    }
+
+    if (dir != ".")
+        Directory.CreateDirectory(dir);
+
+    var apiYas = """
+        // A starter Y# API. `ysc api.yas --bin` produces a native binary.
+
+        record Greeting { message: string; }
+
+        fn hello(name: string) -> Greeting ~blocking {
+            return Greeting($"hello, {name}!");
+        }
+
+        route "/" {
+            get "/hello/{name}" => hello;
+        }
+        """;
+
+    var gitignore = """
+        *.dll
+        *.exe
+        *.pdb
+        *.deps.json
+        *.runtimeconfig.json
+        *.staticwebassets.endpoints.json
+        openapi.json
+        web.config
+        api
+        """;
+
+    File.WriteAllText(Path.Combine(dir, "api.yas"), apiYas);
+    File.WriteAllText(Path.Combine(dir, ".gitignore"), gitignore);
+
+    Console.WriteLine($"Scaffolded Y# API in {Path.GetFullPath(dir)}");
+    Console.WriteLine("Next steps:");
+    Console.WriteLine($"  cd {dir}");
+    Console.WriteLine("  ysc api.yas --bin");
+    Console.WriteLine("  ./api");
+    return 0;
+}
+
+static int Watch(string[] args)
+{
+    var file = args.FirstOrDefault(a => !a.StartsWith("-"));
+    if (file is null || !File.Exists(file))
+    {
+        Console.WriteLine("Error: ysc watch requires an existing .yas file");
+        return 1;
+    }
+
+    var fullPath = Path.GetFullPath(file);
+    var dir = Path.GetDirectoryName(fullPath)!;
+    var name = Path.GetFileName(fullPath);
+
+    System.Diagnostics.Process? running = null;
+
+    void Rebuild()
+    {
+        try
+        {
+            if (running is { HasExited: false })
+            {
+                try { running.Kill(entireProcessTree: true); } catch { }
+                running.WaitForExit(2000);
+            }
+
+            Console.WriteLine($"[watch] rebuilding {name}...");
+            var yscLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            var buildPsi = new System.Diagnostics.ProcessStartInfo
+            {
+                WorkingDirectory = dir,
+                UseShellExecute = false
+            };
+            if (yscLocation.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            {
+                buildPsi.FileName = "dotnet";
+                buildPsi.ArgumentList.Add(yscLocation);
+                buildPsi.ArgumentList.Add(file);
+            }
+            else
+            {
+                buildPsi.FileName = yscLocation;
+                buildPsi.ArgumentList.Add(file);
+            }
+            var build = System.Diagnostics.Process.Start(buildPsi)!;
+            build.WaitForExit();
+            if (build.ExitCode != 0)
+            {
+                Console.WriteLine("[watch] build failed; waiting for changes");
+                return;
+            }
+
+            var dll = Path.ChangeExtension(fullPath, ".dll");
+            running = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "dotnet",
+                ArgumentList = { dll },
+                WorkingDirectory = dir,
+                UseShellExecute = false
+            });
+            Console.WriteLine($"[watch] running pid={running?.Id}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[watch] error: {ex.Message}");
+        }
+    }
+
+    Rebuild();
+
+    var watcher = new FileSystemWatcher(dir, name) { EnableRaisingEvents = true };
+    var debounce = DateTime.MinValue;
+    watcher.Changed += (_, _) =>
+    {
+        if ((DateTime.UtcNow - debounce).TotalMilliseconds < 200) return;
+        debounce = DateTime.UtcNow;
+        Rebuild();
+    };
+
+    Console.WriteLine($"[watch] watching {fullPath} (Ctrl-C to exit)");
+    System.Threading.Thread.Sleep(System.Threading.Timeout.Infinite);
+    return 0;
 }
 
 static void PrintDiagnostic(string kind, string file, string source, int line, int column, string? message)

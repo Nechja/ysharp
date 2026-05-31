@@ -1,6 +1,4 @@
-// Tagged-union enums: declare variants and construct them.
-// Match destructuring on variants is a future addition; for now we just
-// build values and confirm their ToString reflects the variant + fields.
+// Tagged-union enums with construction + destructuring in match.
 
 enum Status {
     Pending;
@@ -14,15 +12,19 @@ enum OrderStatus {
     Delivered { receipt: int; };
 }
 
+fn describe(s: OrderStatus) -> string ~blocking {
+    return match s {
+        OrderStatus.Created => "waiting";
+        OrderStatus.Shipped(t) => $"out for delivery, tracking={t}";
+        OrderStatus.Delivered(r) => $"delivered, receipt={r}";
+    };
+}
+
 fn main() -> void {
     let s = Status.Active;
     print($"plain: {s}");
 
-    let o1 = OrderStatus.Created;
-    let o2 = OrderStatus.Shipped("1Z999");
-    let o3 = OrderStatus.Delivered(42);
-
-    print($"created: {o1}");
-    print($"shipped: {o2}");
-    print($"delivered: {o3}");
+    print(describe(OrderStatus.Created));
+    print(describe(OrderStatus.Shipped("1Z999")));
+    print(describe(OrderStatus.Delivered(42)));
 }

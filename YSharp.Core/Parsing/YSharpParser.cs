@@ -296,12 +296,31 @@ public static class YSharpParser
         Token.EqualTo(YSharpToken.Underscore)
             .Select(t => (Expr)new WildcardExpr(t.Span));
 
-    /// <summary>Pattern for match arms: literal, identifier, or wildcard</summary>
+    // Variant pattern: TypeName.VariantName, or TypeName.VariantName(bind1, bind2)
+    // destructured into named locals.
+    private static TokenListParser<YSharpToken, Expr> VariantPattern { get; } =
+        from typeName in Token.EqualTo(YSharpToken.Identifier)
+        from dot in Token.EqualTo(YSharpToken.Dot)
+        from variantName in Token.EqualTo(YSharpToken.Identifier)
+        from bindings in (
+            from lparen in Token.EqualTo(YSharpToken.LParen)
+            from binds in Token.EqualTo(YSharpToken.Identifier).ManyDelimitedBy(Token.EqualTo(YSharpToken.Comma))
+            from rparen in Token.EqualTo(YSharpToken.RParen)
+            select binds
+        ).OptionalOrDefault(Array.Empty<Token<YSharpToken>>())
+        select (Expr)new CallExpr(
+            new MemberAccessExpr(new IdentifierExpr(typeName.ToStringValue(), typeName.Span), variantName.ToStringValue(), typeName.Span),
+            new List<TypeRef>(),
+            bindings.Select(b => (Expr)new IdentifierExpr(b.ToStringValue(), b.Span)).ToList(),
+            typeName.Span);
+
+    /// <summary>Pattern for match arms: literal, variant destructure, identifier, or wildcard</summary>
     private static TokenListParser<YSharpToken, Expr> Pattern { get; } =
         Wildcard
             .Or(IntLiteral)
             .Or(BoolLiteral)
             .Or(StringLiteral)
+            .Or(VariantPattern.Try())
             .Or(Identifier);
 
     /// <summary>Match arm: pattern => result;</summary>

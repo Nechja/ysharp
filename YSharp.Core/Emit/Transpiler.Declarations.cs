@@ -111,21 +111,61 @@ public partial class Transpiler
 
     private void TranspileFunctionBody(FnDecl fn)
     {
+        var logged = fn.Modifiers.Any(m => m.Name == "log");
+        if (logged) _usesLog = true;
+
         if (fn.Body is not null)
         {
             AppendLine("{");
             _indent++;
+            if (logged) BeginLogScope(fn.Name);
             foreach (var stmt in fn.Body.Statements)
                 TranspileStatement(stmt);
+            if (logged) EndLogScope(fn.Name);
             _indent--;
             AppendLine("}");
         }
         else if (fn.ExprBody is not null)
         {
-            Append("    => ");
-            TranspileExpression(fn.ExprBody);
-            _sb.AppendLine(";");
+            if (logged)
+            {
+                // Promote expression-body to statement body so we can wrap with timing.
+                AppendLine("{");
+                _indent++;
+                BeginLogScope(fn.Name);
+                Append("return ");
+                TranspileExpression(fn.ExprBody);
+                _sb.AppendLine(";");
+                EndLogScope(fn.Name);
+                _indent--;
+                AppendLine("}");
+            }
+            else
+            {
+                Append("    => ");
+                TranspileExpression(fn.ExprBody);
+                _sb.AppendLine(";");
+            }
         }
+    }
+
+    private void BeginLogScope(string fnName)
+    {
+        AppendLine($"var __sw = System.Diagnostics.Stopwatch.StartNew();");
+        AppendLine($"__Y.Log(\"info\", \"fn={fnName} enter\");");
+        AppendLine("try {");
+        _indent++;
+    }
+
+    private void EndLogScope(string fnName)
+    {
+        _indent--;
+        AppendLine("} finally {");
+        _indent++;
+        AppendLine("__sw.Stop();");
+        AppendLine($"__Y.Log(\"info\", $\"fn={fnName} exit ms={{__sw.ElapsedMilliseconds}}\");");
+        _indent--;
+        AppendLine("}");
     }
 
     private void TranspileInterface(InterfaceDecl iface)
@@ -363,17 +403,38 @@ public partial class Transpiler
         AppendLine("");
     }
 
-    // If the handler returns Result<T>, wrap it in a lambda that maps to HTTP
-    // status codes via __Y.Wrap. Otherwise hand the method group to MapGet as-is.
+    // Wraps a route handler in a lambda when codegen needs to do something with
+    // the return value: ~created/~accepted/~noContent → status-code IResult,
+    // Result<T> → status-mapped IResult. Otherwise hand the method group to MapGet as-is.
     private string BuildHandlerExpression(string handlerName)
     {
-        if (!_fnsByName.TryGetValue(handlerName, out var fn) || !IsResultReturn(fn.ReturnType))
+        if (!_fnsByName.TryGetValue(handlerName, out var fn))
             return Capitalize(handlerName);
 
-        _usesResultHttp = true;
+        var statusModifier = fn.Modifiers.FirstOrDefault(m =>
+            m.Name is "created" or "accepted" or "noContent");
+
+        if (statusModifier is null && !IsResultReturn(fn.ReturnType))
+            return Capitalize(handlerName);
+
         var paramList = string.Join(", ", fn.Params.Select(p => $"{TranspileType(p.Type)} {EscapeIdent(p.Name)}"));
         var argList = string.Join(", ", fn.Params.Select(p => EscapeIdent(p.Name)));
-        return $"({paramList}) => __Y.Wrap({Capitalize(handlerName)}({argList}))";
+        var call = $"{Capitalize(handlerName)}({argList})";
+
+        if (statusModifier is not null)
+        {
+            var wrap = statusModifier.Name switch
+            {
+                "created"   => $"Microsoft.AspNetCore.Http.Results.Created((string?)null, {call})",
+                "accepted"  => $"Microsoft.AspNetCore.Http.Results.Accepted((string?)null, {call})",
+                "noContent" => $"{{ {call}; return Microsoft.AspNetCore.Http.Results.NoContent(); }}",
+                _ => call
+            };
+            return $"({paramList}) => {wrap}";
+        }
+
+        _usesResultHttp = true;
+        return $"({paramList}) => __Y.Wrap({call})";
     }
 
     private static bool IsResultReturn(TypeRef t) =>
@@ -412,6 +473,20 @@ public partial class Transpiler
         foreach (var err in errors)
             AppendLine($"[JsonSerializable(typeof({err.Name}))]");
         AppendLine("internal partial class AppJsonContext : JsonSerializerContext { }");
+        AppendLine("");
+    }
+
+    private void EmitConcatHelper()
+    {
+        AppendLine("static partial class __Y");
+        AppendLine("{");
+        AppendLine("    public static System.Collections.Generic.List<T> Concat<T>(System.Collections.Generic.IEnumerable<T> a, System.Collections.Generic.IEnumerable<T> b)");
+        AppendLine("    {");
+        AppendLine("        var r = new System.Collections.Generic.List<T>(a);");
+        AppendLine("        r.AddRange(b);");
+        AppendLine("        return r;");
+        AppendLine("    }");
+        AppendLine("}");
         AppendLine("");
     }
 

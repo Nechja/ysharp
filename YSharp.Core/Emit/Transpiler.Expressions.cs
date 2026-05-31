@@ -35,6 +35,19 @@ public partial class Transpiler
 
     private void TranspileBinary(BinaryExpr bin)
     {
+        // `+` involving an array literal is list concatenation; route through a
+        // helper so List<T>'s missing operator+ doesn't leak out into the emit.
+        if (bin.Op == "+" && (bin.Left is ArrayExpr || bin.Right is ArrayExpr))
+        {
+            _usesConcat = true;
+            _sb.Append("__Y.Concat(");
+            TranspileExpression(bin.Left);
+            _sb.Append(", ");
+            TranspileExpression(bin.Right);
+            _sb.Append(")");
+            return;
+        }
+
         _sb.Append("(");
         TranspileExpression(bin.Left);
         _sb.Append($" {bin.Op} ");
@@ -73,6 +86,15 @@ public partial class Transpiler
             _sb.Append("__Y.Length(");
             TranspileExpression(member.Target);
             _sb.Append(")");
+            return;
+        }
+
+        // `EnumName.UnitVariant` in value position needs to instantiate, not
+        // just name the nested type. The constructed name is in _typeNames.
+        if (member.Target is IdentifierExpr typeId &&
+            _typeNames.Contains($"{typeId.Name}.{member.Member}"))
+        {
+            _sb.Append($"new {typeId.Name}.{member.Member}()");
             return;
         }
 
@@ -202,9 +224,40 @@ public partial class Transpiler
 
     private void TranspileMatchArm(MatchArm arm)
     {
-        TranspileExpression(arm.Pattern);
+        EmitPattern(arm.Pattern);
         _sb.Append(" => ");
         TranspileExpression(arm.Result);
+    }
+
+    // Patterns are mostly emitted as expressions, but variant destructure
+    // `Type.Variant(bind1, bind2)` becomes a C# positional pattern that lifts
+    // the bindings as locals in the arm body. Zero-arg variants emit as the
+    // bare type so they match the `is Type.Variant` shape.
+    private void EmitPattern(Expr pattern)
+    {
+        if (pattern is CallExpr { Target: MemberAccessExpr ma } call
+            && ma.Target is IdentifierExpr typeId
+            && call.Args.All(a => a is IdentifierExpr))
+        {
+            if (call.Args.Count == 0)
+            {
+                _sb.Append($"{typeId.Name}.{ma.Member}");
+                return;
+            }
+
+            _sb.Append($"{typeId.Name}.{ma.Member}(");
+            var first = true;
+            foreach (var arg in call.Args.Cast<IdentifierExpr>())
+            {
+                if (!first) _sb.Append(", ");
+                first = false;
+                _sb.Append($"var {EscapeIdent(arg.Name)}");
+            }
+            _sb.Append(")");
+            return;
+        }
+
+        TranspileExpression(pattern);
     }
 
     private void TranspileCall(CallExpr call)
