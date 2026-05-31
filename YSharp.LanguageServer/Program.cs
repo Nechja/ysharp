@@ -9,7 +9,8 @@ public static class Program
         var server = await OmniSharp.Extensions.LanguageServer.Server.LanguageServer.From(opts => opts
             .WithInput(Console.OpenStandardInput())
             .WithOutput(Console.OpenStandardOutput())
-            .WithHandler<TextDocumentSyncHandler>());
+            .WithHandler<TextDocumentSyncHandler>()
+            .WithHandler<DocumentSymbolHandler>());
 
         await server.WaitForExit;
     }
