@@ -4,6 +4,7 @@ using Superpower;
 using YSharp.Core.Lexing;
 using YSharp.Core.Parsing;
 using YSharp.Core.Runtime;
+using YSharp.Core.TypeCheck;
 
 var bless = args.Contains("--bless");
 
@@ -136,6 +137,10 @@ return failed > 0 ? 1 : 0;
     var ast = YSharpParser.Program.TryParse(tokens.Value);
     if (!ast.HasValue)
         return (false, "", "parse", ast.ErrorMessage ?? "");
+
+    var diags = new TypeChecker().Check(ast.Value);
+    if (diags.Count > 0)
+        return (false, "", "typecheck", diags[0].Message);
 
     var interp = new Interpreter();
     Exception? runtimeEx = null;

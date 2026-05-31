@@ -1,0 +1,2 @@
+fn act() -> void { return 42; }
+fn main() -> void { act(); }

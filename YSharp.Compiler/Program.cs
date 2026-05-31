@@ -3,6 +3,7 @@ using YSharp.Compiler.Emit;
 using YSharp.Core.Emit;
 using YSharp.Core.Lexing;
 using YSharp.Core.Parsing;
+using YSharp.Core.TypeCheck;
 
 // =====================================================================
 // Y# Compiler
@@ -75,6 +76,16 @@ if (!parseResult.HasValue)
     if (string.IsNullOrWhiteSpace(msg) && parseResult.Expectations is { } exp && exp.Any())
         msg = SummarizeExpectations(exp.Distinct().ToArray());
     PrintDiagnostic("parse", inputFile, source, parseResult.ErrorPosition.Line, parseResult.ErrorPosition.Column, msg);
+    return 1;
+}
+
+// ===== Typecheck =====
+var typeChecker = new TypeChecker();
+var diagnostics = typeChecker.Check(parseResult.Value);
+if (diagnostics.Count > 0)
+{
+    foreach (var d in diagnostics)
+        PrintDiagnostic(d.Kind, inputFile, source, d.Span.Position.Line, d.Span.Position.Column, d.Message);
     return 1;
 }
 

@@ -1,0 +1,2 @@
+fn foo() -> int { print("x"); }
+fn main() -> void { print(foo()); }
