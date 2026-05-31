@@ -69,6 +69,68 @@ jobs:
           name: ysc-${{ matrix.rid }}
           path: ysc-${{ matrix.rid }}.*
 
+  publish-lsp:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            os: ubuntu-latest
+            archive: tar.gz
+          - rid: linux-arm64
+            os: ubuntu-latest
+            archive: tar.gz
+          - rid: osx-x64
+            os: macos-latest
+            archive: tar.gz
+          - rid: osx-arm64
+            os: macos-latest
+            archive: tar.gz
+          - rid: win-x64
+            os: windows-latest
+            archive: zip
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      # The LSP can't be AOT (OmniSharp's protocol stack uses reflection);
+      # ship it as a self-contained single-file JIT binary instead.
+      - name: Publish single-file LSP binary
+        run: >
+          dotnet publish YSharp.LanguageServer
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:DebugType=none
+          -p:DebugSymbols=false
+          -o publish-lsp/${{ matrix.rid }}
+
+      - name: Package (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        run: |
+          cd publish-lsp/${{ matrix.rid }}
+          tar -czf ../../ysharp-lsp-${{ matrix.rid }}.tar.gz ysharp-lsp
+
+      - name: Package (zip)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path publish-lsp/${{ matrix.rid }}/ysharp-lsp.exe -DestinationPath ysharp-lsp-${{ matrix.rid }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ysharp-lsp-${{ matrix.rid }}
+          path: ysharp-lsp-${{ matrix.rid }}.*
+
   nuget:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
@@ -97,7 +159,7 @@ jobs:
           --skip-duplicate
 
   release:
-    needs: [publish, nuget]
+    needs: [publish, publish-lsp, nuget]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
