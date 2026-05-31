@@ -1,1 +1,4 @@
-Enums defined!
+plain: Status.Active
+created: OrderStatus.Created
+shipped: OrderStatus.Shipped(tracking: 1Z999)
+delivered: OrderStatus.Delivered(receipt: 42)

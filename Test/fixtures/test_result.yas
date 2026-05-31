@@ -1,15 +1,18 @@
-// Test Result<T> type with implicit conversion
+// Exercise the built-in Result<T> + Error variants that the HTTP wrapper
+// (when routes are present) maps to status codes.
 
-fn divide(a: int, b: int) -> Result<int> {
-    if b == 0 {
-        return Error.Validation("division by zero");
+fn lookup(id: int) -> Result<string> {
+    if id == 1 {
+        return "alpha";
     }
-    return a / b;
+    if id == 2 {
+        return Error.Validation("id 2 is reserved");
+    }
+    return Error.NotFound($"no entry for id {id}");
 }
 
 fn main() -> void {
-    let result1 = divide(10, 2);
-    let result2 = divide(10, 0);
-    print(result1);
-    print(result2);
+    print(lookup(1));
+    print(lookup(2));
+    print(lookup(999));
 }

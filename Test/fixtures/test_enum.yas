@@ -1,4 +1,6 @@
-// Test enum declarations (tagged unions)
+// Tagged-union enums: declare variants and construct them.
+// Match destructuring on variants is a future addition; for now we just
+// build values and confirm their ToString reflects the variant + fields.
 
 enum Status {
     Pending;
@@ -8,11 +10,19 @@ enum Status {
 
 enum OrderStatus {
     Created;
-    Processing { order_id: int; };
-    Shipped { tracking: string; estimated_days: int; };
-    Delivered;
+    Shipped { tracking: string; };
+    Delivered { receipt: int; };
 }
 
 fn main() -> void {
-    print("Enums defined!");
+    let s = Status.Active;
+    print($"plain: {s}");
+
+    let o1 = OrderStatus.Created;
+    let o2 = OrderStatus.Shipped("1Z999");
+    let o3 = OrderStatus.Delivered(42);
+
+    print($"created: {o1}");
+    print($"shipped: {o2}");
+    print($"delivered: {o3}");
 }

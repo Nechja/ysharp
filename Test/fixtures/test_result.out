@@ -1,2 +1,3 @@
-5
-Error.Validation("division by zero")
+alpha
+Error.Validation("id 2 is reserved")
+Error.NotFound("no entry for id 999")
