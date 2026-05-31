@@ -81,6 +81,7 @@ try
     var useDi = transpiler.UsesDependencyInjection;
     var useWeb = transpiler.UsesHttpRoutes;
 
+    string outputDir;
     if (buildBinary)
     {
         Console.WriteLine("Building native binary...");
@@ -88,6 +89,7 @@ try
         Console.WriteLine();
         Console.WriteLine($"Output: ./{assemblyName}");
         Console.WriteLine($"Run:    ./{assemblyName}");
+        outputDir = ".";
     }
     else
     {
@@ -97,6 +99,14 @@ try
         Console.WriteLine();
         Console.WriteLine($"Output: {outputPath}");
         Console.WriteLine($"Run:    dotnet {outputPath}");
+        outputDir = Path.GetDirectoryName(Path.GetFullPath(outputPath)) ?? ".";
+    }
+
+    if (transpiler.OpenApiSpec is { } spec)
+    {
+        var openApiPath = Path.Combine(outputDir, "openapi.json");
+        File.WriteAllText(openApiPath, spec);
+        Console.WriteLine($"OpenAPI: {openApiPath}");
     }
 }
 catch (Exception ex)

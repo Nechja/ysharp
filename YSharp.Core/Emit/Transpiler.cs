@@ -171,7 +171,14 @@ public partial class Transpiler(string assemblyName)
             EmitResultHttpHelper();
 
         if (_usesRoutes)
+        {
             EmitJsonContext(records.ToList(), enums.ToList(), errors.ToList());
+            BuildOpenApiSpec(assemblyName, routes.ToList(), records.ToList(), enums.ToList(), errors.ToList());
+        }
+        else
+        {
+            OpenApiSpec = null;
+        }
 
         // === FINAL ASSEMBLY: top-level first, then types ===
         return _topSb.ToString() + _typeSb.ToString();
