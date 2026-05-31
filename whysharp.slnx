@@ -2,4 +2,5 @@
   <Project Path="Test/Test.csproj" />
   <Project Path="YSharp.Compiler/YSharp.Compiler.csproj" />
   <Project Path="YSharp.Core/YSharp.Core.csproj" />
+  <Project Path="YSharp.LanguageServer/YSharp.LanguageServer.csproj" />
 </Solution>
