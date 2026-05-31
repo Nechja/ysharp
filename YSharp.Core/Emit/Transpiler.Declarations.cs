@@ -423,20 +423,26 @@ public partial class Transpiler
         var argList = string.Join(", ", fn.Params.Select(p => EscapeIdent(p.Name)));
         var call = $"{Capitalize(handlerName)}({argList})";
 
+        // Async-by-default handlers need `await` and an `async` lambda. Blocking ones
+        // can stay sync (no `~blocking` on the fn → it's async).
+        var isAsync = !IsBlocking(fn);
+        var asyncKw = isAsync ? "async " : "";
+        var awaited = isAsync ? $"await {call}" : call;
+
         if (statusModifier is not null)
         {
             var wrap = statusModifier.Name switch
             {
-                "created"   => $"Microsoft.AspNetCore.Http.Results.Created((string?)null, {call})",
-                "accepted"  => $"Microsoft.AspNetCore.Http.Results.Accepted((string?)null, {call})",
-                "noContent" => $"{{ {call}; return Microsoft.AspNetCore.Http.Results.NoContent(); }}",
-                _ => call
+                "created"   => $"Microsoft.AspNetCore.Http.Results.Created((string?)null, {awaited})",
+                "accepted"  => $"Microsoft.AspNetCore.Http.Results.Accepted((string?)null, {awaited})",
+                "noContent" => $"{{ {awaited}; return Microsoft.AspNetCore.Http.Results.NoContent(); }}",
+                _ => awaited
             };
-            return $"({paramList}) => {wrap}";
+            return $"{asyncKw}({paramList}) => {wrap}";
         }
 
         _usesResultHttp = true;
-        return $"({paramList}) => __Y.Wrap({call})";
+        return $"{asyncKw}({paramList}) => __Y.Wrap({awaited})";
     }
 
     private static bool IsResultReturn(TypeRef t) =>
@@ -522,9 +528,10 @@ public partial class Transpiler
         AppendLine("{");
         AppendLine("    public static void Log(string level, string message)");
         AppendLine("    {");
+        AppendLine("        // JsonEncodedText.Encode is reflection-free, so this survives AOT trimming.");
         AppendLine("        var ts = System.DateTime.UtcNow.ToString(\"o\");");
-        AppendLine("        var json = System.Text.Json.JsonSerializer.Serialize(message);");
-        AppendLine("        System.Console.WriteLine($\"{{\\\"level\\\":\\\"{level}\\\",\\\"ts\\\":\\\"{ts}\\\",\\\"msg\\\":{json}}}\");");
+        AppendLine("        var msg = System.Text.Json.JsonEncodedText.Encode(message);");
+        AppendLine("        System.Console.WriteLine($\"{{\\\"level\\\":\\\"{level}\\\",\\\"ts\\\":\\\"{ts}\\\",\\\"msg\\\":\\\"{msg}\\\"}}\");");
         AppendLine("    }");
         AppendLine("}");
         AppendLine("");

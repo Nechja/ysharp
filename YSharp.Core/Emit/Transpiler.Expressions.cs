@@ -117,9 +117,9 @@ public partial class Transpiler
     {
         if (array.Elements.Count == 0)
         {
-            // Empty literal — element type can't be inferred. Caller's typed slot
-            // (field, assignment) determines T, but we don't have that context here.
-            _sb.Append("new List<object>()");
+            // Empty collection expression — C# infers the element type from the
+            // target slot (List<Why> field, return type, etc.).
+            _sb.Append("[]");
             return;
         }
 
