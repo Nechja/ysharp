@@ -25,6 +25,7 @@ public partial class Transpiler(string assemblyName)
     private bool _usesResultHttp;
     private bool _usesLog;
     private bool _usesConcat;
+    private bool _usesHttpClient;
     private readonly HashSet<string> _typeNames = [];
     private readonly HashSet<string> _asyncFunctions = [];
     private readonly HashSet<string> _voidFunctions = [];
@@ -47,6 +48,7 @@ public partial class Transpiler(string assemblyName)
         _usesResultHttp = false;
         _usesLog = false;
         _usesConcat = false;
+        _usesHttpClient = false;
 
         var mainFn = declarations.OfType<FnDecl>().FirstOrDefault(f => f.Name == "main");
         var otherFns = declarations.OfType<FnDecl>().Where(f => f.Name != "main");
@@ -181,6 +183,9 @@ public partial class Transpiler(string assemblyName)
 
         if (_usesConcat)
             EmitConcatHelper();
+
+        if (_usesHttpClient)
+            EmitHttpHelper();
 
         if (_usesRoutes)
         {

@@ -476,6 +476,30 @@ public partial class Transpiler
         AppendLine("");
     }
 
+    // Outbound HTTP. Wraps HttpClient in Result<string> per Y# error conventions.
+    // HttpClient itself is AOT-safe since .NET 8.
+    private void EmitHttpHelper()
+    {
+        AppendLine("static partial class __Y");
+        AppendLine("{");
+        AppendLine("    private static readonly System.Net.Http.HttpClient __http = new();");
+        AppendLine("    public static async System.Threading.Tasks.Task<Result<string>> HttpGet(string url)");
+        AppendLine("    {");
+        AppendLine("        try { return await __http.GetStringAsync(url); }");
+        AppendLine("        catch (System.Exception ex) { return Error.Failure(ex.Message); }");
+        AppendLine("    }");
+        AppendLine("    public static async System.Threading.Tasks.Task<Result<string>> HttpPost(string url, string body)");
+        AppendLine("    {");
+        AppendLine("        try {");
+        AppendLine("            var resp = await __http.PostAsync(url, new System.Net.Http.StringContent(body));");
+        AppendLine("            return await resp.Content.ReadAsStringAsync();");
+        AppendLine("        }");
+        AppendLine("        catch (System.Exception ex) { return Error.Failure(ex.Message); }");
+        AppendLine("    }");
+        AppendLine("}");
+        AppendLine("");
+    }
+
     private void EmitConcatHelper()
     {
         AppendLine("static partial class __Y");

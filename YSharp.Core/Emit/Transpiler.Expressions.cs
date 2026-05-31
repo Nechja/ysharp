@@ -330,6 +330,31 @@ public partial class Transpiler
             return;
         }
 
+        // `req.header("name")` on an HttpRequest — read an inbound header.
+        // No way to introspect target type, so we match by member name + 1 arg
+        // and emit an indexer access into `.Headers`.
+        if (member.Member == "header" && call.Args.Count == 1)
+        {
+            TranspileExpression(member.Target);
+            _sb.Append(".Headers[");
+            TranspileExpression(call.Args[0]);
+            _sb.Append("].ToString()");
+            return;
+        }
+
+        // Built-in `http.get(url)` / `http.post(url, body)`. Returns Result<string>.
+        if (member.Target is IdentifierExpr httpId && httpId.Name == "http" &&
+            member.Member is "get" or "post")
+        {
+            _usesHttpClient = true;
+            _usesResult = true;
+            var name = char.ToUpperInvariant(member.Member[0]) + member.Member[1..];
+            _sb.Append($"(await __Y.Http{name}(");
+            TranspileArgs(call.Args);
+            _sb.Append("))");
+            return;
+        }
+
         if (member.Target is IdentifierExpr enumName)
         {
             var fullName = $"{enumName.Name}.{member.Member}";

@@ -28,6 +28,10 @@ public partial class Transpiler
             "double" => "double",
             "bool" => "bool",
             "string" => "string",
+            // Built-in HTTP types — handler params typed as these get the
+            // matching ASP.NET object injected by minimal API.
+            "HttpRequest" => "Microsoft.AspNetCore.Http.HttpRequest",
+            "HttpResponse" => "Microsoft.AspNetCore.Http.HttpResponse",
             _ => named.Name
         },
         GenericTypeRef generic => $"{generic.Name}<{string.Join(", ", generic.TypeArgs.Select(TranspileType))}>",
