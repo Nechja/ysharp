@@ -7,121 +7,93 @@ namespace YSharp.Compiler.Emit;
 /// </summary>
 public static class Builder
 {
-    /// <summary>
-    /// Build to a .dll (requires dotnet to run).
-    /// </summary>
+    /// <summary>Build to a .dll (requires dotnet to run).</summary>
     public static void BuildDll(string csharpSource, string outputPath, bool useDi = false, bool useWeb = false)
     {
-        var assemblyName = Path.GetFileNameWithoutExtension(outputPath);
-        var outputDir = Path.GetDirectoryName(Path.GetFullPath(outputPath)) ?? ".";
-
-        using var tempDir = new TempDirectory();
-        var projectDir = Path.Combine(tempDir.Path, assemblyName);
-        Directory.CreateDirectory(projectDir);
-
-        // Write source
-        File.WriteAllText(Path.Combine(projectDir, "Program.cs"), csharpSource);
-
-        // Write csproj
-        var sdk = useWeb ? "Microsoft.NET.Sdk.Web" : "Microsoft.NET.Sdk";
-        var diPackage = useDi
-            ? "\n    <PackageReference Include=\"Microsoft.Extensions.DependencyInjection\" Version=\"9.0.0\" />"
-            : "";
-
-        File.WriteAllText(Path.Combine(projectDir, $"{assemblyName}.csproj"), $"""
-            <Project Sdk="{sdk}">
-              <PropertyGroup>
-                <OutputType>Exe</OutputType>
-                <TargetFramework>net10.0</TargetFramework>
-                <ImplicitUsings>enable</ImplicitUsings>
-              </PropertyGroup>
-              <ItemGroup>{diPackage}
-              </ItemGroup>
-            </Project>
-            """);
-
-        // Build (use publish when dependencies exist to include them)
-        if (useDi || useWeb)
+        var (assemblyName, projectDir, tempDir, outputDir) = SetupProject(csharpSource, outputPath, useWeb, useDi, aot: false);
+        using (tempDir)
         {
-            RunDotnet(projectDir, "publish -c Release --nologo -v q");
-
-            // Copy all published outputs
-            var publishDir = Path.Combine(projectDir, "bin", "Release", "net10.0", "publish");
-            foreach (var file in Directory.GetFiles(publishDir))
+            // For DI / web projects we need publish (so the deps fall into one folder).
+            // For plain projects, a plain build + copying the dll is enough.
+            if (useDi || useWeb)
             {
-                var destPath = Path.Combine(outputDir, Path.GetFileName(file));
-                File.Copy(file, destPath, overwrite: true);
+                RunDotnet(projectDir, "publish -c Release --nologo -v q");
+                var publishDir = Path.Combine(projectDir, "bin", "Release", "net10.0", "publish");
+                foreach (var file in Directory.GetFiles(publishDir))
+                    File.Copy(file, Path.Combine(outputDir, Path.GetFileName(file)), overwrite: true);
             }
-        }
-        else
-        {
-            RunDotnet(projectDir, "build -c Release --nologo -v q");
-
-            // Copy output
-            var builtDll = Path.Combine(projectDir, "bin", "Release", "net10.0", $"{assemblyName}.dll");
-            var builtConfig = Path.Combine(projectDir, "bin", "Release", "net10.0", $"{assemblyName}.runtimeconfig.json");
-
-            File.Copy(builtDll, outputPath, overwrite: true);
-            File.Copy(builtConfig, Path.ChangeExtension(outputPath, ".runtimeconfig.json"), overwrite: true);
+            else
+            {
+                RunDotnet(projectDir, "build -c Release --nologo -v q");
+                var built = Path.Combine(projectDir, "bin", "Release", "net10.0", $"{assemblyName}.dll");
+                File.Copy(built, outputPath, overwrite: true);
+                File.Copy(Path.ChangeExtension(built, ".runtimeconfig.json"),
+                          Path.ChangeExtension(outputPath, ".runtimeconfig.json"), overwrite: true);
+            }
         }
     }
 
-    /// <summary>
-    /// Build to a native binary (self-contained, no dotnet required).
-    /// </summary>
+    /// <summary>Build to a native AOT binary (self-contained, no dotnet required to run).</summary>
     public static void BuildBinary(string csharpSource, string outputPath, bool useDi = false, bool useWeb = false)
+    {
+        var (assemblyName, projectDir, tempDir, outputDir) = SetupProject(csharpSource, outputPath, useWeb, useDi, aot: true);
+        using (tempDir)
+        {
+            var rid = GetRuntimeIdentifier();
+            // AOT runs ILC — slower than a JIT build, but produces a small
+            // native binary with no .NET runtime dependency.
+            RunDotnet(projectDir, $"publish -c Release -r {rid} --nologo -v q");
+
+            var binaryName = rid.StartsWith("win") ? $"{assemblyName}.exe" : assemblyName;
+            var published = Path.Combine(projectDir, "bin", "Release", "net10.0", rid, "publish", binaryName);
+            var finalPath = Path.Combine(outputDir, binaryName);
+            File.Copy(published, finalPath, overwrite: true);
+
+            if (!OperatingSystem.IsWindows())
+                File.SetUnixFileMode(finalPath,
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                    UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                    UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+        }
+    }
+
+    // Writes Program.cs + csproj to a fresh temp dir. Returns the bits both build paths share.
+    private static (string assemblyName, string projectDir, IDisposable tempDir, string outputDir)
+        SetupProject(string csharpSource, string outputPath, bool useWeb, bool useDi, bool aot)
     {
         var assemblyName = Path.GetFileNameWithoutExtension(outputPath);
         var outputDir = Path.GetDirectoryName(Path.GetFullPath(outputPath)) ?? ".";
-        var rid = GetRuntimeIdentifier();
 
-        using var tempDir = new TempDirectory();
+        var tempDir = new TempDirectory();
         var projectDir = Path.Combine(tempDir.Path, assemblyName);
         Directory.CreateDirectory(projectDir);
 
-        // Write source
         File.WriteAllText(Path.Combine(projectDir, "Program.cs"), csharpSource);
+        File.WriteAllText(Path.Combine(projectDir, $"{assemblyName}.csproj"), CsprojFor(useWeb, useDi, aot));
+        return (assemblyName, projectDir, tempDir, outputDir);
+    }
 
-        // Write csproj
+    private static string CsprojFor(bool useWeb, bool useDi, bool aot)
+    {
         var sdk = useWeb ? "Microsoft.NET.Sdk.Web" : "Microsoft.NET.Sdk";
         var diPackage = useDi
             ? "\n    <PackageReference Include=\"Microsoft.Extensions.DependencyInjection\" Version=\"9.0.0\" />"
             : "";
+        var aotProps = aot
+            ? "\n    <PublishAot>true</PublishAot>\n    <InvariantGlobalization>true</InvariantGlobalization>\n    <StripSymbols>true</StripSymbols>"
+            : "";
 
-        File.WriteAllText(Path.Combine(projectDir, $"{assemblyName}.csproj"), $"""
+        return $"""
             <Project Sdk="{sdk}">
               <PropertyGroup>
                 <OutputType>Exe</OutputType>
                 <TargetFramework>net10.0</TargetFramework>
-                <ImplicitUsings>enable</ImplicitUsings>
-                <PublishAot>true</PublishAot>
-                <InvariantGlobalization>true</InvariantGlobalization>
-                <StripSymbols>true</StripSymbols>
+                <ImplicitUsings>enable</ImplicitUsings>{aotProps}
               </PropertyGroup>
               <ItemGroup>{diPackage}
               </ItemGroup>
             </Project>
-            """);
-
-        // Publish — AOT runs ILC so this is noticeably slower than a JIT build,
-        // but produces a small native binary with no .NET runtime dependency.
-        RunDotnet(projectDir, $"publish -c Release -r {rid} --nologo -v q");
-
-        // Copy binary
-        var binaryName = rid.StartsWith("win") ? $"{assemblyName}.exe" : assemblyName;
-        var publishedBinary = Path.Combine(projectDir, "bin", "Release", "net10.0", rid, "publish", binaryName);
-        var finalPath = Path.Combine(outputDir, binaryName);
-
-        File.Copy(publishedBinary, finalPath, overwrite: true);
-
-        // Make executable on Unix
-        if (!OperatingSystem.IsWindows())
-        {
-            File.SetUnixFileMode(finalPath,
-                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
-                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
-                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
-        }
+            """;
     }
 
     private static void RunDotnet(string workingDir, string arguments)
@@ -145,9 +117,7 @@ public static class Builder
         process.WaitForExit();
 
         if (process.ExitCode != 0)
-        {
             throw new InvalidOperationException($"dotnet {arguments} failed:\n{stderr}\n{stdout}");
-        }
     }
 
     private static string GetRuntimeIdentifier()
@@ -162,9 +132,6 @@ public static class Builder
         return "linux-x64";
     }
 
-    /// <summary>
-    /// Helper class to manage temp directory cleanup.
-    /// </summary>
     private sealed class TempDirectory : IDisposable
     {
         public string Path { get; } = System.IO.Path.Combine(
@@ -176,7 +143,7 @@ public static class Builder
         public void Dispose()
         {
             try { Directory.Delete(Path, recursive: true); }
-            catch { /* ignore cleanup errors */ }
+            catch { /* cleanup is best-effort */ }
         }
     }
 }

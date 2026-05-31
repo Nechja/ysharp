@@ -295,8 +295,10 @@ public partial class Transpiler
 
     private void TranspileClassField(ClassField field)
     {
+        // Keep the user's original casing — method bodies reference `entries` and
+        // emitted C# must match (capitalizing would produce undefined-name errors).
         var modifier = field.IsMutable ? "" : "readonly ";
-        Append($"public {modifier}{TranspileType(field.Type)} {Capitalize(field.Name)}");
+        Append($"public {modifier}{TranspileType(field.Type)} {EscapeIdent(field.Name)}");
         if (field.DefaultValue is not null)
         {
             _sb.Append(" = ");

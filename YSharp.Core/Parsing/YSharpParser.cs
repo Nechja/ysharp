@@ -1,3 +1,7 @@
+// Superpower's combinator types have nullability mismatches we can't fix from
+// the outside — disable nullable checking for this file to keep build output clean.
+#nullable disable
+
 using Superpower;
 using Superpower.Model;
 using Superpower.Parsers;
