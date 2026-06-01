@@ -250,11 +250,6 @@ public class TypeChecker
         switch (expr)
         {
             case IdentifierExpr id:
-                // Interpolated-string sub-expressions are parsed by a simplified
-                // parser that can emit "nums[0]" as a single identifier name.
-                // Skip names with non-identifier characters — they're parser artifacts.
-                if (id.Name.Any(c => !char.IsLetterOrDigit(c) && c != '_'))
-                    break;
                 if (!ResolveIdent(id.Name))
                     Report("typecheck", $"undefined identifier '{id.Name}'", id.Span);
                 break;

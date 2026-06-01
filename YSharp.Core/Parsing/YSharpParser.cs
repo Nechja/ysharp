@@ -189,14 +189,14 @@ public static class YSharpParser
         text = text.Trim();
 
         // Handle binary operators (low precedence first: +, -)
-        // Find operator not inside parentheses, scanning right to left for left associativity
-        var parenDepth = 0;
+        // Find operator not inside parens or brackets, scanning right to left for left associativity.
+        var depth = 0;
         for (var i = text.Length - 1; i >= 0; i--)
         {
             var c = text[i];
-            if (c == ')') parenDepth++;
-            else if (c == '(') parenDepth--;
-            else if (parenDepth == 0 && (c == '+' || c == '-') && i > 0)
+            if (c == ')' || c == ']') depth++;
+            else if (c == '(' || c == '[') depth--;
+            else if (depth == 0 && (c == '+' || c == '-') && i > 0)
             {
                 // Make sure it's not a unary minus at the start
                 var left = text[..i].Trim();
@@ -213,13 +213,13 @@ public static class YSharpParser
         }
 
         // Handle *, / (higher precedence)
-        parenDepth = 0;
+        depth = 0;
         for (var i = text.Length - 1; i >= 0; i--)
         {
             var c = text[i];
-            if (c == ')') parenDepth++;
-            else if (c == '(') parenDepth--;
-            else if (parenDepth == 0 && (c == '*' || c == '/') && i > 0)
+            if (c == ')' || c == ']') depth++;
+            else if (c == '(' || c == '[') depth--;
+            else if (depth == 0 && (c == '*' || c == '/') && i > 0)
             {
                 var left = text[..i].Trim();
                 var right = text[(i + 1)..].Trim();
@@ -244,12 +244,39 @@ public static class YSharpParser
             return new DoubleLiteralExpr(doubleVal, span);
         }
 
+        // Handle index access: ...[expr]. The trailing ']' must match a top-level
+        // '[' — find by scanning right-to-left so chained `matrix[0][1]` works.
+        if (text.EndsWith(']'))
+        {
+            var depthIdx = 0;
+            var openIdx = -1;
+            for (var i = text.Length - 1; i >= 0; i--)
+            {
+                var c = text[i];
+                if (c == ']' || c == ')') depthIdx++;
+                else if (c == '[' || c == '(')
+                {
+                    depthIdx--;
+                    if (depthIdx == 0 && c == '[') { openIdx = i; break; }
+                }
+            }
+            if (openIdx > 0)
+            {
+                var collectionText = text[..openIdx];
+                var indexText = text[(openIdx + 1)..^1].Trim();
+                return new IndexAccessExpr(
+                    ParseSimpleExpression(collectionText, span),
+                    ParseSimpleExpression(indexText, span),
+                    span);
+            }
+        }
+
         // Handle function calls: name() or name(args)
         var parenIndex = text.IndexOf('(');
         if (parenIndex > 0 && text.EndsWith(')'))
         {
             var funcName = text[..parenIndex];
-            var argsText = text[(parenIndex + 1)..^1].Trim();
+            var argsText = text[(parenIndex + 1)..^1].Trim().TrimEnd(',').TrimEnd();
 
             // Parse target (could be member access like obj.method)
             Expr target = ParseMemberAccess(funcName, span);
@@ -258,10 +285,12 @@ public static class YSharpParser
             var args = new List<Expr>();
             if (!string.IsNullOrEmpty(argsText))
             {
-                // Simple split by comma (doesn't handle nested commas)
+                // Simple split by comma (doesn't handle nested commas).
                 foreach (var arg in argsText.Split(','))
                 {
-                    args.Add(ParseSimpleExpression(arg.Trim(), span));
+                    var trimmed = arg.Trim();
+                    if (trimmed.Length == 0) continue; // tolerate trailing comma
+                    args.Add(ParseSimpleExpression(trimmed, span));
                 }
             }
 
@@ -451,15 +480,15 @@ public static class YSharpParser
             // Generic function call: <types>(args) - must Try() because < could be comparison
             (from typeArgs in CallTypeArgs
              from lparen in Token.EqualTo(YSharpToken.LParen)
-             from args in Expression.ManyDelimitedBy(Token.EqualTo(YSharpToken.Comma))
+             from args in CallArgList
              from rparen in Token.EqualTo(YSharpToken.RParen)
-             select (Func<Expr, Expr>)(e => new CallExpr(e, typeArgs, args.ToList(), EmptySpan))).Try()
+             select (Func<Expr, Expr>)(e => new CallExpr(e, typeArgs, args, EmptySpan))).Try()
             .Or(
             // Non-generic function call: (args)
             from lparen in Token.EqualTo(YSharpToken.LParen)
-            from args in Expression.ManyDelimitedBy(Token.EqualTo(YSharpToken.Comma))
+            from args in CallArgList
             from rparen in Token.EqualTo(YSharpToken.RParen)
-            select (Func<Expr, Expr>)(e => new CallExpr(e, new List<TypeRef>(), args.ToList(), EmptySpan)))
+            select (Func<Expr, Expr>)(e => new CallExpr(e, new List<TypeRef>(), args, EmptySpan)))
             .Or(
             // Index access: [index]
              from lbracket in Token.EqualTo(YSharpToken.LBracket)
@@ -745,12 +774,34 @@ public static class YSharpParser
         from type in TypeReference
         select new Param(name.ToStringValue(), type, name.Span);
 
-    /// <summary>Parameter list: (a: int, b: int)</summary>
+    /// <summary>Call argument list — trailing comma allowed.</summary>
+    private static TokenListParser<YSharpToken, List<Expr>> CallArgList { get; } =
+        (
+            from first in Parse.Ref(() => Expression)
+            from rest in (
+                from comma in Token.EqualTo(YSharpToken.Comma)
+                from e in Parse.Ref(() => Expression)
+                select e
+            ).Try().Many()
+            from trailing in Token.EqualTo(YSharpToken.Comma).Optional()
+            select new[] { first }.Concat(rest).ToList()
+        ).OptionalOrDefault(new List<Expr>());
+
+    /// <summary>Parameter list: (a: int, b: int) — trailing comma allowed.</summary>
     private static TokenListParser<YSharpToken, List<Param>> Parameters { get; } =
         from lparen in Token.EqualTo(YSharpToken.LParen)
-        from parms in Parameter.ManyDelimitedBy(Token.EqualTo(YSharpToken.Comma))
+        from parms in (
+            from first in Parameter
+            from rest in (
+                from comma in Token.EqualTo(YSharpToken.Comma)
+                from p in Parameter
+                select p
+            ).Try().Many()
+            from trailing in Token.EqualTo(YSharpToken.Comma).Optional()
+            select new[] { first }.Concat(rest).ToList()
+        ).OptionalOrDefault(new List<Param>())
         from rparen in Token.EqualTo(YSharpToken.RParen)
-        select parms.ToList();
+        select parms;
 
     // =========================================================================
     // RECORDS

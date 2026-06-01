@@ -137,6 +137,18 @@ public partial class Transpiler
 
     private void TranspileCompoundAssign(CompoundAssignStmt compound)
     {
+        // `xs += [y]` desugars to `xs = xs + [y]` so the binary `+` emitter can
+        // route through __Y.Concat for list concatenation (List<T> has no `+=`).
+        if (compound.Op == "+" && compound.Value is ArrayExpr)
+        {
+            var target = EscapeIdent(compound.Target);
+            _usesConcat = true;
+            Append($"{target} = __Y.Concat({target}, ");
+            TranspileExpression(compound.Value);
+            _sb.AppendLine(");");
+            return;
+        }
+
         Append($"{EscapeIdent(compound.Target)} {compound.Op}= ");
         TranspileExpression(compound.Value);
         _sb.AppendLine(";");
