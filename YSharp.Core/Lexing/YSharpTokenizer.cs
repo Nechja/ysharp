@@ -23,20 +23,12 @@ public static class YSharpTokenizer
     // These recognize patterns in raw text. They don't produce tokens yet,
     // just confirm "yes, this text matches the pattern."
 
-    /// <summary>
-    /// Matches a string literal: "anything except quotes"
-    /// The 'from/select' syntax is LINQ query syntax - reads like English.
-    /// </summary>
     private static TextParser<Unit> StringToken { get; } =
         from open in Character.EqualTo('"')
         from content in Character.Except('"').Many()
         from close in Character.EqualTo('"')
         select Unit.Value;  // We don't care about the value here, just that it matched
 
-    /// <summary>
-    /// Matches an interpolated string: $"text {expr} more"
-    /// Handles nested braces in expressions by counting depth.
-    /// </summary>
     private static TextParser<Unit> InterpolatedStringToken { get; } =
         from dollar in Character.EqualTo('$')
         from open in Character.EqualTo('"')
@@ -44,37 +36,22 @@ public static class YSharpTokenizer
         from close in Character.EqualTo('"')
         select Unit.Value;
 
-    /// <summary>
-    /// Parses the content of an interpolated string, handling {expr} parts.
-    /// </summary>
     private static TextParser<Unit> InterpolatedContent { get; } =
         Span.MatchedBy(
             Character.Matching(c => c != '"', "interpolated content").Many()
         ).Select(_ => Unit.Value);
 
-    /// <summary>
-    /// Matches an identifier: letter or underscore, then letters/digits/underscores
-    /// Examples: foo, _bar, myVar123, __init__
-    /// </summary>
     private static TextParser<Unit> IdentifierToken { get; } =
         from first in Character.Letter.Or(Character.EqualTo('_'))
         from rest in Character.LetterOrDigit.Or(Character.EqualTo('_')).Many()
         select Unit.Value;
 
-    /// <summary>
-    /// Matches a decimal number: digits.digits
-    /// Examples: 3.14, 0.5, 100.0
-    /// </summary>
     private static TextParser<Unit> DecimalToken { get; } =
         from whole in Character.Digit.AtLeastOnce()
         from dot in Character.EqualTo('.')
         from frac in Character.Digit.AtLeastOnce()
         select Unit.Value;
 
-    /// <summary>
-    /// Matches an integer: one or more digits
-    /// Examples: 0, 42, 12345
-    /// </summary>
     private static TextParser<Unit> IntegerToken { get; } =
         from digits in Character.Digit.AtLeastOnce()
         select Unit.Value;
@@ -117,7 +94,6 @@ public static class YSharpTokenizer
             .Match(Character.EqualTo('<'), YSharpToken.LessThan)
             .Match(Character.EqualTo('>'), YSharpToken.GreaterThan)
 
-            // ----- Punctuation -----
             .Match(Character.EqualTo('('), YSharpToken.LParen)
             .Match(Character.EqualTo(')'), YSharpToken.RParen)
             .Match(Character.EqualTo('{'), YSharpToken.LBrace)
@@ -130,7 +106,6 @@ public static class YSharpTokenizer
             .Match(Character.EqualTo('.'), YSharpToken.Dot)
             .Match(Character.EqualTo('~'), YSharpToken.Tilde)
 
-            // ----- Strings -----
             .Match(InterpolatedStringToken, YSharpToken.InterpolatedString)
             .Match(StringToken, YSharpToken.String)
 

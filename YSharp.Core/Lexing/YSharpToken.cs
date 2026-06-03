@@ -1,32 +1,19 @@
 namespace YSharp.Core.Lexing;
 
-/// <summary>
-/// All token types in the Y# language.
-///
-/// Think of tokens as the "vocabulary" of Y#. Before we can understand
-/// the grammar (parsing), we need to recognize individual words (lexing).
-/// </summary>
 public enum YSharpToken
 {
-    // ===== Literals =====
     // These are tokens that carry a value
 
-    /// <summary>Any name: variable, function, type, etc.</summary>
     Identifier,
 
-    /// <summary>Whole numbers: 42, 0, 1000</summary>
     Integer,
 
-    /// <summary>Decimal numbers: 3.14, 0.5</summary>
     Decimal,
 
-    /// <summary>Text in quotes: "hello"</summary>
     String,
 
-    /// <summary>Interpolated string: $"hello {name}"</summary>
     InterpolatedString,
 
-    // ===== Keywords =====
     // Reserved words with special meaning
 
     Fn,         // fn - function declaration
@@ -76,7 +63,6 @@ public enum YSharpToken
     ModifierKw, // modifier - custom middleware declaration
 
     // ===== Type Keywords =====
-    // Built-in type names
 
     Int,        // int - 32-bit integer
     Long,       // long - 64-bit integer
@@ -85,8 +71,6 @@ public enum YSharpToken
     Bool,       // bool - true/false
     StringType, // string - text (can't use "String" as it conflicts)
     Void,       // void - no return value
-
-    // ===== Operators =====
 
     Plus,           // +
     Minus,          // -
@@ -112,8 +96,6 @@ public enum YSharpToken
     StarEquals,     // *=
     SlashEquals,    // /=
     PercentEquals,  // %=
-
-    // ===== Punctuation =====
 
     LParen,     // (
     RParen,     // )

@@ -2,14 +2,6 @@ using YSharp.Core.Ast;
 
 namespace YSharp.Core.TypeCheck;
 
-/// <summary>
-/// Minimum-viable typechecker. Catches the loudest problems before they hit Roslyn:
-/// undefined identifiers, function-call arity mismatch, return-vs-void mismatch.
-///
-/// Designed to be permissive: when types are ambiguous or unknown (generics,
-/// inferred record types, DI-injected services), we skip checks rather than
-/// reject valid programs.
-/// </summary>
 public class TypeChecker
 {
     private static readonly HashSet<string> BuiltinIdentifiers =
@@ -328,7 +320,7 @@ public class TypeChecker
 
     private void CollectPatternBindings(Expr pattern)
     {
-        // Variant destructure: Type.Variant(bind1, bind2) — bindings are IdentifierExpr args.
+        // Variant destructure: Type.Variant(bind1, bind2) -- bindings are IdentifierExpr args.
         if (pattern is CallExpr { Target: MemberAccessExpr } call)
         {
             foreach (var arg in call.Args)
@@ -345,8 +337,8 @@ public class TypeChecker
         // Arity check against a known top-level fn.
         if (call.Target is IdentifierExpr id)
         {
-            if (_types.Contains(id.Name)) return; // record/service constructor — skip arity (records have synthesized ctor)
-            if (BuiltinIdentifiers.Contains(id.Name)) return; // print/env/etc — variadic-ish
+            if (_types.Contains(id.Name)) return; // record/service constructor -- skip arity (records have synthesized ctor)
+            if (BuiltinIdentifiers.Contains(id.Name)) return; // print/env/etc -- variadic-ish
 
             if (_functions.TryGetValue(id.Name, out var fn))
             {
@@ -367,7 +359,7 @@ public class TypeChecker
             return;
         }
 
-        // Member call (obj.method) or other complex target — recurse into target.
+        // Member call (obj.method) or other complex target -- recurse into target.
         CheckExpr(call.Target);
     }
 

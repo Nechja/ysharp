@@ -2,10 +2,6 @@ using YSharp.Core.Ast;
 
 namespace YSharp.Core.Runtime;
 
-/// <summary>
-/// Simple AST interpreter for Y# - executes code directly without compilation.
-/// Used for the language tour/playground to show immediate results.
-/// </summary>
 public class Interpreter
 {
     private readonly List<string> _output = [];
@@ -35,57 +31,34 @@ public class Interpreter
         _scopes.Clear();
         _scopes.Push(new Scope());
 
-        // First pass: collect declarations
         foreach (var decl in declarations)
         {
             switch (decl)
             {
-                case FnDecl fn:
-                    _functions[fn.Name] = fn;
-                    break;
-                case RecordDecl rec:
-                    _records[rec.Name] = rec;
-                    break;
-                case EnumDecl enm:
-                    _enums[enm.Name] = enm;
-                    break;
-                case ErrorDecl err:
-                    _errors[err.Name] = err;
-                    break;
-                case ServiceDecl svc:
-                    _services[svc.Name] = svc;
-                    break;
-                case InterfaceDecl iface:
-                    _interfaces[iface.Name] = iface;
-                    break;
+                case FnDecl fn: _functions[fn.Name] = fn; break;
+                case RecordDecl rec: _records[rec.Name] = rec; break;
+                case EnumDecl enm: _enums[enm.Name] = enm; break;
+                case ErrorDecl err: _errors[err.Name] = err; break;
+                case ServiceDecl svc: _services[svc.Name] = svc; break;
+                case InterfaceDecl iface: _interfaces[iface.Name] = iface; break;
                 case ModuleDecl mod:
-                    // Register bindings from module
                     foreach (var binding in mod.Bindings)
-                    {
                         _bindings[binding.Interface] = binding.Implementation;
-                    }
                     break;
             }
         }
 
-        // Check for app declaration (composition root with DI)
         var appDecl = declarations.OfType<AppDecl>().FirstOrDefault();
         if (appDecl != null)
         {
-            // Resolve dependencies for app's main function
             var args = new List<object?>();
             foreach (var param in appDecl.MainFn.Params)
             {
-                var typeName = param.Type switch
-                {
-                    NamedTypeRef named => named.Name,
-                    _ => ""
-                };
+                var typeName = param.Type switch { NamedTypeRef n => n.Name, _ => "" };
                 args.Add(ResolveService(typeName));
             }
             ExecuteFunction(appDecl.MainFn, args);
         }
-        // Otherwise execute standalone main if it exists
         else if (_functions.TryGetValue("main", out var main))
         {
             ExecuteFunction(main, []);
@@ -96,18 +69,15 @@ public class Interpreter
     {
         _scopes.Push(new Scope());
 
-        // Bind parameters
         for (int i = 0; i < fn.Params.Count && i < args.Count; i++)
         {
             CurrentScope[fn.Params[i].Name] = args[i];
         }
 
-        // Check for modifiers
         var hasLog = fn.Modifiers.Any(m => m.Name == "log");
         var hasTimed = fn.Modifiers.Any(m => m.Name == "timed");
         System.Diagnostics.Stopwatch? stopwatch = null;
 
-        // Pre-execution modifier behavior
         if (hasLog)
             _output.Add($"[log] entering {fn.Name}");
         if (hasTimed)
@@ -131,7 +101,6 @@ public class Interpreter
                 result = Evaluate(fn.ExprBody);
             }
 
-            // Post-execution modifier behavior
             stopwatch?.Stop();
             if (hasTimed)
                 _output.Add($"[timed] {fn.Name} completed in {stopwatch!.ElapsedMilliseconds}ms");
@@ -202,7 +171,6 @@ public class Interpreter
             case ForStmt forStmt:
                 return ExecuteFor(forStmt);
 
-
             case BreakStmt:
                 return new BreakSignal();
 
@@ -224,7 +192,6 @@ public class Interpreter
         {
             if (forStmt.Variable == null)
             {
-                // While-style: for condition { }
                 while (IsTruthy(Evaluate(forStmt.Iterable)))
                 {
                     var result = ExecuteBlock(forStmt.Body);
@@ -234,7 +201,6 @@ public class Interpreter
             }
             else if (forStmt.Iterable is RangeExpr range)
             {
-                // Range: for i in 0..10 { }
                 var start = ToInt(Evaluate(range.Start));
                 var end = ToInt(Evaluate(range.End));
                 for (int i = start; i < end; i++)
@@ -247,7 +213,6 @@ public class Interpreter
             }
             else
             {
-                // Foreach: for item in collection { }
                 var collection = Evaluate(forStmt.Iterable);
                 if (collection is IEnumerable<object?> items)
                 {
@@ -267,7 +232,6 @@ public class Interpreter
             _scopes.Pop();
         }
     }
-
 
     private object? Evaluate(Expr expr)
     {
@@ -317,7 +281,6 @@ public class Interpreter
 
             case MatchExpr match:
                 return EvaluateMatch(match);
-
 
             case WithExpr with:
                 return EvaluateWith(with);
@@ -411,7 +374,6 @@ public class Interpreter
 
     private object? EvaluateCall(CallExpr call)
     {
-        // Handle print specially
         if (call.Target is IdentifierExpr { Name: "print" })
         {
             var args = call.Args.Select(Evaluate).ToList();
@@ -432,7 +394,6 @@ public class Interpreter
             return ResolveService(interfaceName);
         }
 
-        // Handle record construction
         if (call.Target is IdentifierExpr id && _records.TryGetValue(id.Name, out var recordDecl))
         {
             var args = call.Args.Select(Evaluate).ToList();
@@ -444,7 +405,6 @@ public class Interpreter
             return instance;
         }
 
-        // Handle Error.Validation, Error.NotFound, etc. (built-in error types)
         if (call.Target is MemberAccessExpr errorAccess &&
             errorAccess.Target is IdentifierExpr errorId &&
             errorId.Name == "Error")
@@ -454,7 +414,6 @@ public class Interpreter
             return new ResultValue(null, new ErrorValue(errorAccess.Member, message));
         }
 
-        // Handle custom error type construction (e.g., TrailError.PermitRequired(...))
         if (call.Target is MemberAccessExpr customErrorAccess &&
             customErrorAccess.Target is IdentifierExpr customErrorName &&
             _errors.TryGetValue(customErrorName.Name, out var errorDecl))
@@ -472,7 +431,6 @@ public class Interpreter
             }
         }
 
-        // Handle enum variant construction (no args = singleton)
         if (call.Target is MemberAccessExpr enumAccess &&
             enumAccess.Target is IdentifierExpr enumName &&
             _enums.TryGetValue(enumName.Name, out var enumDecl))
@@ -490,14 +448,12 @@ public class Interpreter
             }
         }
 
-        // Handle user-defined functions
         if (call.Target is IdentifierExpr fnId && _functions.TryGetValue(fnId.Name, out var fn))
         {
             var args = call.Args.Select(Evaluate).ToList();
             return ExecuteFunction(fn, args);
         }
 
-        // Handle lambda calls
         if (call.Target is IdentifierExpr lambdaId)
         {
             var maybeVal = GetVariable(lambdaId.Name);
@@ -507,7 +463,6 @@ public class Interpreter
             }
         }
 
-        // Handle method calls on objects
         if (call.Target is MemberAccessExpr methodCall)
         {
             var target = Evaluate(methodCall.Target);
@@ -539,7 +494,6 @@ public class Interpreter
 
     private object? EvaluateMethodCall(object? target, string method, List<object?> args)
     {
-        // List methods - using if/else for side effects
         if (target is List<object?> list)
         {
             if (method is "len" or "length" or "count")
@@ -563,7 +517,6 @@ public class Interpreter
                 return list.Count == 0;
         }
 
-        // String methods
         if (target is string s)
         {
             return method switch
@@ -588,14 +541,12 @@ public class Interpreter
             };
         }
 
-        // Record methods
         if (target is RecordInstance record)
         {
             if (method == "toString")
                 return record.ToString();
         }
 
-        // Service methods
         if (target is ServiceInstance service)
         {
             return ExecuteServiceMethod(service, method, args);
@@ -778,7 +729,6 @@ public class Interpreter
                 return true;
 
             case MemberAccessExpr memberPattern when value is EnumInstance enumInst:
-                // Match Enum.Variant
                 if (memberPattern.Target is IdentifierExpr enumType &&
                     enumType.Name == enumInst.EnumName &&
                     memberPattern.Member == enumInst.VariantName)
@@ -792,7 +742,6 @@ public class Interpreter
                     enumTypeId.Name == enumInst.EnumName &&
                     variantAccess.Member == enumInst.VariantName)
                 {
-                    // Extract field bindings
                     var fieldNames = enumInst.Fields.Keys.ToList();
                     for (int i = 0; i < callPattern.Args.Count && i < fieldNames.Count; i++)
                     {
@@ -809,7 +758,6 @@ public class Interpreter
                 return false;
         }
     }
-
 
     private object? EvaluateWith(WithExpr with)
     {
@@ -853,10 +801,8 @@ public class Interpreter
             }
         }
 
-        // Create service instance
         var instance = new ServiceInstance(serviceDecl);
 
-        // Store singleton
         if (serviceDecl.Lifetime == ServiceLifetime.Singleton)
         {
             _singletons[serviceName] = instance;
@@ -873,7 +819,6 @@ public class Interpreter
         _scopes.Push(new Scope());
         try
         {
-            // Bind parameters
             for (int i = 0; i < method.Params.Count && i < args.Count; i++)
             {
                 CurrentScope[method.Params[i].Name] = args[i];
@@ -965,7 +910,6 @@ public class Interpreter
         _ => value.ToString() ?? "null"
     };
 
-    // Helper types
     private class Scope : Dictionary<string, object?>
     {
         public Scope() { }
@@ -982,11 +926,10 @@ public class Interpreter
     private record PropagateError(ResultValue Result);
 }
 
-// Runtime value types
 public class RecordInstance(string typeName)
 {
     public string TypeName { get; } = typeName;
-    // Case-insensitive so `point.x` and `point.X` both work — matches the
+    // Case-insensitive so `point.x` and `point.X` both work -- matches the
     // PascalCase mapping the transpiler emits to C#.
     public Dictionary<string, object?> Fields { get; } = new(StringComparer.OrdinalIgnoreCase);
 

@@ -5,9 +5,6 @@ using YSharp.Core.Lexing;
 using YSharp.Core.Parsing;
 using YSharp.Core.TypeCheck;
 
-// =====================================================================
-// Y# Compiler
-// =====================================================================
 // Usage: ysc <file.yas> [--bin]
 //   --bin  Produce a self-contained native binary
 
@@ -15,7 +12,6 @@ var showHelp = args.Contains("--help") || args.Contains("-h");
 var buildBinary = args.Contains("--bin");
 var emitCSharp = args.Contains("--emit-cs");
 
-// Subcommands
 if (args.Length > 0 && args[0] == "init")
     return Init(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "watch")
@@ -50,7 +46,6 @@ if (showHelp)
 Console.WriteLine("=== Y# Compiler ===");
 Console.WriteLine();
 
-// Check file exists
 if (!File.Exists(inputFile))
 {
     Console.WriteLine($"Error: File not found: {inputFile}");
@@ -60,7 +55,6 @@ if (!File.Exists(inputFile))
 var source = File.ReadAllText(inputFile);
 Console.WriteLine($"Compiling: {inputFile}");
 
-// ===== Tokenize =====
 var tokenResult = YSharpTokenizer.Instance.TryTokenize(source);
 if (!tokenResult.HasValue)
 {
@@ -68,7 +62,6 @@ if (!tokenResult.HasValue)
     return 1;
 }
 
-// ===== Parse =====
 var parseResult = YSharpParser.Program.TryParse(tokenResult.Value);
 if (!parseResult.HasValue)
 {
@@ -79,7 +72,6 @@ if (!parseResult.HasValue)
     return 1;
 }
 
-// ===== Typecheck =====
 var typeChecker = new TypeChecker();
 var diagnostics = typeChecker.Check(parseResult.Value);
 if (diagnostics.Count > 0)
@@ -101,7 +93,6 @@ if (emitCSharp)
     return 0;
 }
 
-// ===== Build =====
 try
 {
     var useDi = transpiler.UsesDependencyInjection;

@@ -28,7 +28,7 @@ public partial class Transpiler
             "double" => "double",
             "bool" => "bool",
             "string" => "string",
-            // Built-in HTTP types — handler params typed as these get the
+            // Built-in HTTP types -- handler params typed as these get the
             // matching ASP.NET object injected by minimal API.
             "HttpRequest" => "Microsoft.AspNetCore.Http.HttpRequest",
             "HttpResponse" => "Microsoft.AspNetCore.Http.HttpResponse",
@@ -91,7 +91,7 @@ public partial class Transpiler
          .Replace("\r", "\\r");
 
     // C# reserved words that a Y# user might legitimately use as an identifier
-    // (Y# keywords like `class`/`if`/`fn` are excluded — they can never reach here).
+    // (Y# keywords like `class`/`if`/`fn` are excluded -- they can never reach here).
     private static readonly HashSet<string> CSharpReservedWords =
     [
         "abstract", "as", "base", "byte", "case", "catch", "checked", "const",

@@ -31,7 +31,7 @@ public class TextDocumentSyncHandler(ILanguageServerFacade router) : TextDocumen
 
     public override Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken _)
     {
-        // We register Full sync below — only one change with the entire buffer.
+        // We register Full sync below -- only one change with the entire buffer.
         var text = request.ContentChanges.FirstOrDefault()?.Text ?? "";
         _buffers[request.TextDocument.Uri] = text;
         Publish(request.TextDocument.Uri, text);

@@ -2,12 +2,8 @@ using System.Diagnostics;
 
 namespace YSharp.Compiler.Emit;
 
-/// <summary>
-/// Builds C# code into .NET assemblies or native binaries.
-/// </summary>
 public static class Builder
 {
-    /// <summary>Build to a .dll (requires dotnet to run).</summary>
     public static void BuildDll(string csharpSource, string outputPath, bool useDi = false, bool useWeb = false)
     {
         var (assemblyName, projectDir, tempDir, outputDir) = SetupProject(csharpSource, outputPath, useWeb, useDi, aot: false);
@@ -40,7 +36,7 @@ public static class Builder
         using (tempDir)
         {
             var rid = GetRuntimeIdentifier();
-            // AOT runs ILC — slower than a JIT build, but produces a small
+            // AOT runs ILC -- slower than a JIT build, but produces a small
             // native binary with no .NET runtime dependency.
             RunDotnet(projectDir, $"publish -c Release -r {rid} --nologo -v q");
 

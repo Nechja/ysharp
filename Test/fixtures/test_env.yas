@@ -1,5 +1,5 @@
 // `env(name)` reads an env var. Returns null when unset.
-// Common idiom: `env("FOO") ?? "default"` — but Y# doesn't have ??, so
+// Common idiom: `env("FOO") ?? "default"` -- but Y# doesn't have ??, so
 // for now just print the raw lookup of an unset name.
 
 fn main() -> void {

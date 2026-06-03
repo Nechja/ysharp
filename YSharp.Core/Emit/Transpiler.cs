@@ -3,15 +3,6 @@ using YSharp.Core.Ast;
 
 namespace YSharp.Core.Emit;
 
-/// <summary>
-/// Transpiles Y# AST to C# source code.
-///
-/// Y# is to C# what TypeScript is to JavaScript:
-/// - Stricter types
-/// - Cleaner syntax
-/// - Domain-focused (HTTP services)
-/// - Compiles to the host language
-/// </summary>
 public partial class Transpiler(string assemblyName)
 {
     private readonly StringBuilder _topSb = new();

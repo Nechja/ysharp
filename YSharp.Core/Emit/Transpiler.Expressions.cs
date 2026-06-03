@@ -117,7 +117,7 @@ public partial class Transpiler
     {
         if (array.Elements.Count == 0)
         {
-            // Empty collection expression — C# infers the element type from the
+            // Empty collection expression -- C# infers the element type from the
             // target slot (List<Why> field, return type, etc.).
             _sb.Append("[]");
             return;
@@ -290,7 +290,7 @@ public partial class Transpiler
             return;
         }
 
-        // `env(name)` reads an environment variable. Returns string? — pair with
+        // `env(name)` reads an environment variable. Returns string? -- pair with
         // the `?? "default"` operator-style fallback that C# already understands.
         if (id.Name == "env")
         {
@@ -319,7 +319,7 @@ public partial class Transpiler
     private void TranspileMemberCall(MemberAccessExpr member, CallExpr call)
     {
         // Built-in `log.info(...)` / `log.warn(...)` / `log.error(...)` / `log.debug(...)`.
-        // Emits a JSON-lines record via a tiny runtime helper — AOT-safe, no deps.
+        // Emits a JSON-lines record via a tiny runtime helper -- AOT-safe, no deps.
         if (member.Target is IdentifierExpr logId && logId.Name == "log" &&
             member.Member is "info" or "warn" or "error" or "debug")
         {
@@ -330,7 +330,7 @@ public partial class Transpiler
             return;
         }
 
-        // `req.header("name")` on an HttpRequest — read an inbound header.
+        // `req.header("name")` on an HttpRequest -- read an inbound header.
         // No way to introspect target type, so we match by member name + 1 arg
         // and emit an indexer access into `.Headers`.
         if (member.Member == "header" && call.Args.Count == 1)
