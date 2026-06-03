@@ -6,7 +6,7 @@ and HTTP routes are first-class.
 
 ## Status
 
-Personal project, experimental. I'm the only intended user right now. Syntax
+**Personal project**, experimental. I'm the only intended user right now. Syntax
 and codegen change whenever I learn something. No release schedule, no SemVer
 guarantees, no support.
 
@@ -66,6 +66,7 @@ ysc api.yas --bin
 ## What doesn't
 
 * No member-access type checking, no generic type checking
+* No no noing no
 * No validation modifiers, no wire-name overrides
 * No persistence story, no config file loading
 * No response header writing
