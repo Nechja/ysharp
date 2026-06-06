@@ -5,11 +5,11 @@ using YSharp.Core.Lexing;
 using YSharp.Core.Parsing;
 using YSharp.Core.TypeCheck;
 
-// Usage: ysc <file.yas> [--bin]
-//   --bin  Produce a self-contained native binary
+// Usage: ysc <file.yas> [--dll]
+//   --dll  Produce a JIT .dll instead of the default native AOT binary
 
 var showHelp = args.Contains("--help") || args.Contains("-h");
-var buildBinary = args.Contains("--bin");
+var buildBinary = !args.Contains("--dll");
 var emitCSharp = args.Contains("--emit-cs");
 
 if (args.Length > 0 && args[0] == "init")
@@ -30,13 +30,13 @@ if (showHelp)
           ysc watch <file.yas>        rebuild + restart on save
 
         Options:
-          --bin       build as self-contained AOT native binary
+          --dll       build as a JIT .dll (skip AOT for fast iteration)
           --emit-cs   print the generated C# instead of building
           --help      show this help
 
         Examples:
-          ysc hello.yas          # Creates hello.dll (run with: dotnet hello.dll)
-          ysc hello.yas --bin    # Creates hello binary (run with: ./hello)
+          ysc hello.yas          # Creates hello binary (run with: ./hello)
+          ysc hello.yas --dll    # Creates hello.dll (run with: dotnet hello.dll)
           ysc init why-api       # Scaffold a new API project
           ysc watch api.yas      # Live-reload during development
         """);
@@ -163,21 +163,44 @@ static int Init(string[] args)
     if (dir != ".")
         Directory.CreateDirectory(dir);
 
+    var projName = dir == "." ? Path.GetFileName(Path.GetFullPath(".")) : name;
+
     var apiYas = """
-        // A starter Y# API. `ysc api.yas --bin` produces a native binary.
+        // A starter Y# API. `ysc api.yas` produces a native AOT binary.
 
-        record Greeting { message: string; }
-
-        fn hello(name: string) -> Greeting ~blocking {
-            return Greeting($"hello, {name}!");
+        record Greeting {
+            message: string;
         }
+
+        interface IGreeter {
+            fn greet(name: string) -> Greeting ~blocking;
+        }
+
+        service singleton GreetingService : IGreeter {
+            fn greet(name: string) -> Greeting ~blocking
+                => Greeting($"hello, {name}!");
+        }
+
+        module App {
+            bind IGreeter => GreetingService;
+        }
+
+        fn hello(greeter: IGreeter, name: string) -> Greeting ~blocking
+            => greeter.greet(name);
 
         route "/" {
             get "/hello/{name}" => hello;
         }
+
+        app App {
+            fn main() -> void {
+                log.info("starting");
+            }
+        }
         """;
 
     var gitignore = """
+        # Y# build output
         *.dll
         *.exe
         *.pdb
@@ -186,16 +209,63 @@ static int Init(string[] args)
         *.staticwebassets.endpoints.json
         openapi.json
         web.config
-        api
+
+        # Native binary (from `ysc api.yas`)
+        /api
+
+        # .NET intermediate
+        bin/
+        obj/
+
+        # Logs
+        *.log
+
+        # Editor
+        .vs/
+        .vscode/
+        .idea/
+
+        # OS
+        .DS_Store
+        Thumbs.db
+        """;
+
+    var readme = $$"""
+        # {{projName}}
+
+        A Y# API.
+
+        ## Run
+
+        ```
+        ysc api.yas         # native AOT binary (~10MB, no .NET runtime needed)
+        ./api
+        ```
+
+        For fast iteration during development:
+
+        ```
+        ysc watch api.yas   # rebuilds via JIT .dll on save
+        ```
+
+        ## Try it
+
+        ```
+        curl localhost:9900/hello/world
+        ```
+
+        Override the port with `PORT=3000 ./api`. An OpenAPI spec is emitted
+        to `openapi.json` alongside the binary.
         """;
 
     File.WriteAllText(Path.Combine(dir, "api.yas"), apiYas);
     File.WriteAllText(Path.Combine(dir, ".gitignore"), gitignore);
+    File.WriteAllText(Path.Combine(dir, "README.md"), readme);
 
     Console.WriteLine($"Scaffolded Y# API in {Path.GetFullPath(dir)}");
     Console.WriteLine("Next steps:");
     Console.WriteLine($"  cd {dir}");
-    Console.WriteLine("  ysc api.yas --bin");
+    Console.WriteLine("  ysc api.yas");
     Console.WriteLine("  ./api");
     return 0;
 }
@@ -243,6 +313,8 @@ static int Watch(string[] args)
                 buildPsi.FileName = yscLocation;
                 buildPsi.ArgumentList.Add(file);
             }
+            // Watch runs many rebuilds; the JIT dll path is ~10x faster than AOT.
+            buildPsi.ArgumentList.Add("--dll");
             var build = System.Diagnostics.Process.Start(buildPsi)!;
             build.WaitForExit();
             if (build.ExitCode != 0)

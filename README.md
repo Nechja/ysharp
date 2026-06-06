@@ -44,13 +44,13 @@ app Reasons { fn main() -> void { log.info("running"); } }
 ```
 
 ```
-ysc api.yas --bin
+ysc api.yas
 ./api
 ```
 
 ## What works
 
-* `ysc api.yas --bin` produces a ~10MB native AOT binary, no .NET runtime needed
+* `ysc api.yas` produces a ~10MB native AOT binary, no .NET runtime needed (`--dll` for fast JIT iteration)
 * Records, interfaces, services, modules, app DI block
 * Async-first functions, `~blocking` opt-out
 * `Result<T>` auto-maps to HTTP status codes
