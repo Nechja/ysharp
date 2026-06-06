@@ -310,8 +310,25 @@ public class TypeChecker
                 foreach (var update in w.Updates) CheckExpr(update.Value);
                 break;
 
-            // SomeExpr / NoneExpr / Bool/Int/Double/StringLiteral / Wildcard / Blocking / Concurrent / Scope / This:
-            // nothing to check or fully handled by walking sub-expressions in their cases.
+            case ConcurrentExpr cx:
+                // Bindings declared inside `concurrent { let x = ... }` are intentionally
+                // visible in the enclosing scope -- the transpiler emits them inline.
+                foreach (var s in cx.Statements) CheckStmt(s);
+                break;
+
+            case BlockingExpr bx:
+                _scopes.Push(new HashSet<string>());
+                foreach (var s in bx.Statements) CheckStmt(s);
+                if (bx.ResultExpr is not null) CheckExpr(bx.ResultExpr);
+                _scopes.Pop();
+                break;
+
+            case ScopeExpr sx:
+                _scopes.Push(new HashSet<string>());
+                foreach (var s in sx.Statements) CheckStmt(s);
+                _scopes.Pop();
+                break;
+
             case SomeExpr s:
                 CheckExpr(s.Value);
                 break;

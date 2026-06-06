@@ -1,0 +1,5 @@
+Test 1 - Async calls: User-1, Orders-1, Profile-1
+Test 2 - Mixed: User-2, 100
+Test 3 - Single: Orders-3
+Test 4 - Sync only: 1, 2, 3
+All concurrent tests passed!

@@ -1,3 +1,5 @@
 Starting async function
+This runs synchronously
+No async overhead here
 Back to async context
 Result: 42

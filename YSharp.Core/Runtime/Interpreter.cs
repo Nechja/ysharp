@@ -293,6 +293,28 @@ public class Interpreter
             case LambdaExpr lambda:
                 return new LambdaValue(lambda, CaptureScope());
 
+            case ConcurrentExpr cx:
+                foreach (var s in cx.Statements) ExecuteStatement(s);
+                return null;
+
+            case BlockingExpr bx:
+                _scopes.Push(new Scope());
+                try
+                {
+                    foreach (var s in bx.Statements) ExecuteStatement(s);
+                    return bx.ResultExpr is not null ? Evaluate(bx.ResultExpr) : null;
+                }
+                finally { _scopes.Pop(); }
+
+            case ScopeExpr scx:
+                _scopes.Push(new Scope());
+                try
+                {
+                    foreach (var s in scx.Statements) ExecuteStatement(s);
+                    return null;
+                }
+                finally { _scopes.Pop(); }
+
             case TryExpr tryExpr:
                 var result = Evaluate(tryExpr.Operand);
                 if (result is ResultValue rv)
