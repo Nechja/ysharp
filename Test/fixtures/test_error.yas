@@ -1,0 +1,53 @@
+// Test: error type for domain errors
+
+// Define a domain error type for order operations
+error OrderError {
+    NotFound;
+    InvalidQuantity { message: string; };
+    PaymentFailed { code: int; reason: string; };
+}
+
+// Function that returns a Result with our error type
+fn validate_quantity(qty: int) -> Result<int, OrderError> ~blocking {
+    if qty <= 0 {
+        return OrderError.InvalidQuantity("Quantity must be positive");
+    }
+    return qty;
+}
+
+fn find_order(id: int) -> Result<string, OrderError> ~blocking {
+    if id == 0 {
+        return OrderError.NotFound();
+    }
+    if id < 0 {
+        return OrderError.PaymentFailed(-1, "Invalid order ID");
+    }
+    return $"Order-{id}";
+}
+
+fn main() -> void {
+    // Test valid case
+    let result1 = validate_quantity(5);
+    if result1.IsOk {
+        print($"Valid quantity: {result1.Value}");
+    }
+
+    // Test invalid case
+    let result2 = validate_quantity(-1);
+    if result2.IsError {
+        print("Invalid quantity detected");
+    }
+
+    // Test order lookup
+    let order = find_order(42);
+    if order.IsOk {
+        print($"Found: {order.Value}");
+    }
+
+    let missing = find_order(0);
+    if missing.IsError {
+        print("Order not found");
+    }
+
+    print("Done!");
+}

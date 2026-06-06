@@ -1,0 +1,6 @@
+x = -5:
+-5
+negate(10):
+-10
+!true:
+false

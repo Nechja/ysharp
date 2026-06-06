@@ -1,0 +1,6 @@
+Map (42 * 2): 84
+Then chain: 10
+UnwrapOr (success): 42
+UnwrapOr (error): -1
+Chained: 150
+Done!

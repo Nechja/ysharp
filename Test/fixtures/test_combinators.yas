@@ -1,0 +1,51 @@
+// Test: Result combinators
+
+// Parse an integer from a string
+fn parse_int(s: string) -> Result<int> ~blocking {
+    if s == "42" {
+        return 42;
+    }
+    if s == "10" {
+        return 10;
+    }
+    return Error.Validation($"Cannot parse '{s}' as int");
+}
+
+// Double a number
+fn double_it(n: int) -> int ~blocking {
+    return n * 2;
+}
+
+// Validate a number is positive
+fn validate_positive(n: int) -> Result<int> ~blocking {
+    if n > 0 {
+        return n;
+    }
+    return Error.Validation("Number must be positive");
+}
+
+fn main() -> void {
+    // Test map combinator: transform success value
+    let result1 = parse_int("42").Map(x => x * 2);
+    print($"Map (42 * 2): {result1}");
+
+    // Test then combinator: chain result-returning functions
+    let result2 = parse_int("10").Then(x => validate_positive(x));
+    print($"Then chain: {result2}");
+
+    // Test unwrap_or: get value or default
+    let val1 = parse_int("42").UnwrapOr(0);
+    print($"UnwrapOr (success): {val1}");
+
+    let val2 = parse_int("invalid").UnwrapOr(-1);
+    print($"UnwrapOr (error): {val2}");
+
+    // Test chaining multiple combinators
+    let chained = parse_int("10")
+        .Map(x => x + 5)
+        .Then(x => validate_positive(x))
+        .Map(x => x * 10);
+    print($"Chained: {chained}");
+
+    print("Done!");
+}

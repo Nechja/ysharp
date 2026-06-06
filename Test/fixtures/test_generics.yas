@@ -1,0 +1,25 @@
+// Test: Generic functions
+
+// Simple identity function
+fn identity<T>(value: T) -> T ~blocking => value;
+
+// Double generic
+fn makePair<T, U>(first: T, second: U) -> string ~blocking => $"({first}, {second})";
+
+fn main() -> void {
+    // Test identity with different types
+    let num = identity<int>(42);
+    print($"identity int 42 = {num}");
+
+    let text = identity<string>("hello");
+    print($"identity string hello = {text}");
+
+    let flag = identity<bool>(true);
+    print($"identity bool true = {flag}");
+
+    // Test double generic
+    let pair = makePair<int, string>(42, "answer");
+    print($"makePair = {pair}");
+
+    print("Done!");
+}

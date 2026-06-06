@@ -1,0 +1,19 @@
+// Test blocking { } expression
+
+fn async_function() -> int {
+    print("Starting async function");
+
+    // Use blocking { } for synchronous operations
+    blocking {
+        print("This runs synchronously");
+        print("No async overhead here");
+    };
+
+    print("Back to async context");
+    return 42;
+}
+
+fn main() -> void {
+    let result = async_function();
+    print($"Result: {result}");
+}

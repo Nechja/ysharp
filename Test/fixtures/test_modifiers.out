@@ -1,0 +1,9 @@
+This is a blocking operation
+This operation is timed
+[timed] timed_op completed in 0ms
+[log] entering logged_timed
+Logged and timed
+[timed] logged_timed completed in 0ms
+[log] exiting logged_timed
+Has a timeout
+quick = 42
